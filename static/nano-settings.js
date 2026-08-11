@@ -10,7 +10,7 @@ function ensureConnectionSettingsUi() {
   overlay.innerHTML = `
     <div class="nano-connection-panel" role="dialog" aria-labelledby="nano-connection-title">
       <h2 id="nano-connection-title">Connect to Nano</h2>
-      <p>Enter your Pi API URL and key. All processing happens on the Pi.</p>
+      <p>Enter your Pi API URL and key.</p>
       <label for="nano-connection-url">API URL</label>
       <input id="nano-connection-url" type="url" placeholder="https://your-pi.example.com" />
       <label for="nano-connection-key">API key</label>
