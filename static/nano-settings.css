@@ -1,0 +1,73 @@
+.nano-connection-settings {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.72);
+  padding: 1rem;
+}
+
+.nano-connection-settings[hidden] {
+  display: none;
+}
+
+.nano-connection-panel {
+  width: min(28rem, 100%);
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  border-radius: 1rem;
+  background: #111;
+  color: #f5f5f5;
+  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.35);
+}
+
+.nano-connection-panel h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.nano-connection-panel p {
+  margin: 0;
+  color: #c8c8c8;
+}
+
+.nano-connection-panel label {
+  font-size: 0.85rem;
+  color: #d0d0d0;
+}
+
+.nano-connection-panel input {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #333;
+  border-radius: 0.5rem;
+  background: #1b1b1b;
+  color: #fff;
+}
+
+.nano-connection-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.nano-connection-actions button {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.55rem 1rem;
+  background: #2f6fed;
+  color: #fff;
+  cursor: pointer;
+}
+
+.nano-connection-status {
+  min-height: 1.25rem;
+  font-size: 0.9rem;
+  color: #9fd0ff;
+}
+
+.voice-push-toggle.recording {
+  color: #ff6b6b;
+}

@@ -1,0 +1,1812 @@
+/* ── Footer cluster ── */
+
+.footer-cluster {
+  position: fixed;
+  bottom: var(--bottom-bar-offset);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(6px, 1vh, 12px);
+  padding: 0 var(--page-pad-x);
+}
+
+.bottom-bar {
+  width: 100%;
+  max-width: var(--content-max);
+  height: var(--bottom-bar-h);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  padding: 0 clamp(8px, 2vw, 16px);
+  border: none;
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.52);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.38);
+}
+
+.bottom-bar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin: 0 auto;
+  padding: 0;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--accent-soft);
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    background 140ms ease,
+    transform 140ms ease;
+}
+
+.bottom-bar-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.bottom-bar-btn:hover {
+  color: var(--accent-strong);
+  background: rgba(57, 255, 20, 0.07);
+}
+
+.bottom-bar-btn.active {
+  color: var(--accent-strong);
+  background: rgba(57, 255, 20, 0.1);
+  box-shadow: none;
+}
+
+#nano-controls-toggle {
+  position: relative;
+}
+
+/* ── Full-screen view modal ── */
+
+.view-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0)
+    env(safe-area-inset-left, 0);
+  background: rgba(0, 0, 0, 0.72);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 200ms ease, visibility 200ms ease;
+}
+
+.view-modal.open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.view-modal-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  border: 1px solid var(--panel-border);
+  background: linear-gradient(180deg, rgba(6, 12, 8, 0.98), rgba(2, 6, 4, 0.96));
+}
+
+.view-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid rgba(57, 255, 20, 0.09);
+  background: rgba(0, 0, 0, 0.32);
+  flex-shrink: 0;
+}
+
+.view-modal-title {
+  margin: 0;
+  color: var(--accent-strong);
+  font: 800 1.05rem/1.2 "Cascadia Mono", "Consolas", monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.view-modal-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.view-panel {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.view-panel.active {
+  display: flex;
+}
+
+.view-panel[hidden] {
+  display: none !important;
+}
+
+.view-panel-commands {
+  gap: 16px;
+  padding: 16px 18px 20px;
+  overflow: hidden;
+}
+
+.view-panel-commands .commands-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.chrome-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.chrome-close-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.plans-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.05rem;
+  height: 1.05rem;
+  margin-left: 0.35rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #031208;
+  font: 600 0.58rem/1 "Segoe UI", system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  vertical-align: super;
+}
+
+.plans-tab-count[hidden] {
+  display: none !important;
+}
+
+.nano-panel {
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px 16px;
+  overflow: hidden;
+}
+
+.nano-panel.active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.nano-panel-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
+  flex-shrink: 0;
+  padding: 0 2px;
+}
+
+.nano-panel-label {
+  color: rgba(107, 143, 114, 0.9);
+  font: 600 0.72rem/1.2 "Cascadia Mono", "Consolas", monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.panel-action,
+.brains-clear {
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 4px;
+}
+
+.nano-panel .terminal {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  height: 100%;
+  max-height: none;
+  resize: none;
+  border: 1px solid rgba(57, 255, 20, 0.12);
+  border-radius: 4px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #dfffe7;
+  font: 600 0.9rem/1.55 "Cascadia Mono", "Consolas", monospace;
+  outline: none;
+  white-space: pre;
+  overflow: auto;
+}
+
+.nano-panel .terminal::placeholder {
+  color: rgba(107, 143, 114, 0.72);
+}
+
+@media (min-width: 900px) {
+  .view-modal {
+    padding: clamp(12px, 2vh, 24px);
+  }
+
+  .view-modal-panel {
+    max-width: min(1200px, 96vw);
+    max-height: 92vh;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+  }
+
+  .nano-panel .terminal {
+    min-height: 0;
+  }
+}
+
+/* ── Buttons ── */
+
+button {
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, var(--accent-soft), var(--accent-strong));
+  color: #04110a;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 140ms ease, filter 140ms ease, opacity 140ms ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+  transform: none;
+}
+
+.ghost {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+
+body.inputs-locked .bottom-bar-btn:disabled,
+body.inputs-locked #keyboard-toggle:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Commands panel content ── */
+
+.commands-voice-settings {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  flex-shrink: 0;
+}
+
+.commands-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 4px 12px 0;
+}
+
+.commands-dropdown {
+  flex: 0 0 auto;
+  border: none;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  overflow: visible;
+}
+
+.commands-voice-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.commands-voice-header .commands-group-title {
+  margin: 0;
+}
+
+.voice-volume-label {
+  color: var(--muted);
+  font: 600 0.82rem/1 "Segoe UI", system-ui, sans-serif;
+}
+
+.voice-volume-value {
+  color: var(--accent-strong);
+  font: 700 0.78rem/1 "Cascadia Mono", "Consolas", monospace;
+  letter-spacing: 0.06em;
+}
+
+.commands-empty {
+  margin: 0;
+  padding: 12px 4px;
+  color: var(--muted);
+  font: 500 0.88rem/1.45 "Segoe UI", system-ui, sans-serif;
+}
+
+.voice-volume {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+  opacity: 1;
+}
+
+.voice-volume:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.commands-dropdown-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  color: var(--muted);
+  font: 600 0.74rem/1 "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.commands-dropdown[open] .commands-dropdown-toggle {
+  color: var(--accent-strong);
+  border-radius: 12px 12px 0 0;
+}
+
+.commands-dropdown-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.commands-dropdown-toggle::after {
+  content: "";
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 180ms ease, color 140ms ease;
+}
+
+.commands-dropdown[open] .commands-dropdown-toggle::after {
+  transform: rotate(-135deg);
+  margin-top: 4px;
+}
+
+.commands-dropdown .commands-group-grid {
+  display: grid;
+  gap: 8px;
+  padding: 0 10px 12px;
+  border-radius: 0 0 12px 12px;
+}
+
+.commands-group {
+  display: grid;
+  gap: 10px;
+}
+
+.commands-group-title {
+  margin: 0;
+  color: var(--muted);
+  font: 700 0.76rem/1 "Cascadia Mono", "Consolas", monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.commands-group-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.command-button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  border-radius: 16px;
+  padding: 12px 14px;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(57, 255, 20, 0.14);
+  color: var(--text);
+  font-weight: 700;
+  transform: none;
+  filter: none;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.command-button:hover {
+  transform: none;
+  filter: none;
+  border-color: rgba(57, 255, 20, 0.34);
+  background: rgba(57, 255, 20, 0.08);
+}
+
+.command-button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.command-button-label {
+  display: block;
+  color: var(--accent-strong);
+  font: 700 0.92rem/1.3 "Segoe UI", system-ui, sans-serif;
+}
+
+.command-button-description {
+  display: block;
+  margin-top: 0;
+  color: var(--muted);
+  font: 500 0.82rem/1.4 "Segoe UI", system-ui, sans-serif;
+}
+
+/* ── Utilities ── */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (min-width: 600px) {
+  :root {
+    --content-max: 720px;
+    --footer-cluster-h: 128px;
+    --bottom-bar-h: 68px;
+    --bottom-bar-offset: max(24px, env(safe-area-inset-bottom, 0));
+    --page-pad-x: clamp(24px, 5vw, 64px);
+  }
+
+  .essence-canvas-wrap {
+    width: min(100%, calc(min(74vh, 64vw) * var(--essence-size-scale)));
+    height: min(100%, calc(min(74vh, 64vw) * var(--essence-size-scale)));
+  }
+}
+
+@media (min-width: 900px) {
+  :root {
+    --content-max: 960px;
+    --page-pad-x: clamp(40px, 6vw, 120px);
+    --page-pad-top: clamp(20px, 3vh, 40px);
+  }
+
+  body {
+    background:
+      radial-gradient(ellipse at 0% 0%, var(--bg-glow), transparent 50%),
+      radial-gradient(ellipse at 100% 100%, rgba(255, 255, 255, 0.02), transparent 40%),
+      radial-gradient(ellipse at 50% 30%, rgba(255, 255, 255, 0.03), transparent 40%),
+      var(--bg);
+  }
+
+  .top-zone {
+    max-height: 40dvh;
+  }
+
+  .essence-canvas-wrap {
+    width: min(100%, calc(min(84vh, 58vw, 980px) * var(--essence-size-scale)));
+    height: min(100%, calc(min(84vh, 58vw, 980px) * var(--essence-size-scale)));
+  }
+
+  .essence-zone::before {
+    width: min(100%, calc(min(76vh, 52vw, 900px) * var(--essence-size-scale)));
+    height: min(100%, calc(min(76vh, 52vw, 900px) * var(--essence-size-scale)));
+  }
+
+  .bottom-bar {
+    max-width: min(1100px, 92vw);
+  }
+
+  .bottom-bar-btn {
+    width: 56px;
+    height: 56px;
+  }
+}
+
+@media (min-width: 1400px) {
+  :root {
+    --content-max: 1200px;
+  }
+
+  .essence-canvas-wrap {
+    width: min(100%, calc(min(86vh, 54vw, 1080px) * var(--essence-size-scale)));
+    height: min(100%, calc(min(86vh, 54vw, 1080px) * var(--essence-size-scale)));
+  }
+}
+
+@media (max-width: 380px) {
+  :root {
+    --footer-cluster-h: 112px;
+    --bottom-bar-h: 58px;
+  }
+
+  .bottom-bar-btn {
+    width: 46px;
+    height: 46px;
+  }
+}
+
+#nano-panel-plans {
+  overflow: hidden;
+}
+
+.nano-panel-plans.reading {
+  gap: 0;
+  padding-top: 8px;
+}
+
+.nano-panel-plans.reading .nano-panel-toolbar,
+.nano-panel-plans.reading .plans-list {
+  display: none !important;
+}
+
+.nano-panel-plans.reading .plan-reader {
+  position: static;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 4px 0 0;
+  background: transparent;
+}
+
+.plans-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.plans-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 180px;
+  margin: 0;
+  padding: 24px 16px;
+  border: 1px dashed rgba(57, 255, 20, 0.14);
+  border-radius: 8px;
+  color: rgba(107, 143, 114, 0.95);
+  font: 500 0.84rem/1.5 "Cascadia Mono", "Consolas", monospace;
+  text-align: center;
+}
+
+.plan-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  row-gap: 4px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(57, 255, 20, 0.12);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    transform 140ms ease;
+}
+
+.plan-card:hover {
+  border-color: rgba(57, 255, 20, 0.28);
+  background: rgba(8, 18, 12, 0.72);
+  transform: translateY(-1px);
+}
+
+.plan-card-title {
+  grid-column: 1;
+  grid-row: 1;
+  font: 700 0.86rem/1.35 "Cascadia Mono", "Consolas", monospace;
+  color: var(--accent-strong);
+}
+
+.plan-card-meta {
+  grid-column: 1;
+  grid-row: 2;
+  font: 500 0.74rem/1.4 "Cascadia Mono", "Consolas", monospace;
+  color: var(--text-muted);
+}
+
+.plan-card-status {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font: 700 0.66rem/1 "Cascadia Mono", "Consolas", monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.plan-card-status.pending {
+  color: #9dffc0;
+  background: rgba(57, 255, 20, 0.12);
+  border: 1px solid rgba(57, 255, 20, 0.22);
+}
+
+.plan-card-status.waiting {
+  color: #d8f7ff;
+  background: rgba(120, 214, 255, 0.12);
+  border: 1px solid rgba(120, 214, 255, 0.22);
+}
+
+.plan-card-status.processed {
+  color: rgba(107, 143, 114, 0.95);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.plan-reader[hidden] {
+  display: none !important;
+}
+
+.plan-reader {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.plan-reader-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  min-height: 0;
+  padding-bottom: 2px;
+  border-bottom: 1px solid rgba(57, 255, 20, 0.1);
+}
+
+.plan-reader-header h3 {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font: 700 0.84rem/1.35 "Cascadia Mono", "Consolas", monospace;
+  color: var(--accent-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plan-copy-button {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid rgba(57, 255, 20, 0.2);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--accent-soft);
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.plan-copy-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.plan-copy-button:hover:not(:disabled) {
+  border-color: rgba(57, 255, 20, 0.36);
+  background: rgba(57, 255, 20, 0.08);
+  color: var(--accent);
+}
+
+.plan-copy-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.plan-reader-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding: 18px 20px;
+  overflow: auto;
+  border: 1px solid rgba(57, 255, 20, 0.14);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.62);
+  color: var(--text-primary);
+  font: 500 0.92rem/1.65 "Cascadia Mono", "Consolas", monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.nano-panel-plans.reading .plan-reader-body {
+  flex: unset;
+  height: 100%;
+  min-height: 0;
+}
+
+.plan-reader-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+  justify-content: space-between;
+}
+
+.plan-process-button {
+  flex: 0 1 auto;
+  min-width: 0;
+  min-height: 40px;
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(232, 244, 236, 0.88);
+  font: 700 0.8rem/1.2 "Cascadia Mono", "Consolas", monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.plan-process-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.plan-implement-button {
+  flex: 0 1 auto;
+  min-width: 0;
+  min-height: 40px;
+  padding: 10px 16px;
+  border: 1px solid rgba(57, 255, 20, 0.28);
+  border-radius: 6px;
+  background: rgba(57, 255, 20, 0.1);
+  color: var(--accent-strong);
+  font: 700 0.8rem/1.2 "Cascadia Mono", "Consolas", monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.plan-implement-button:hover {
+  background: rgba(57, 255, 20, 0.16);
+  border-color: rgba(57, 255, 20, 0.42);
+}
+
+.plan-implement-button:disabled,
+.plan-process-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.plan-reader-status {
+  margin: 0;
+  color: rgba(255, 140, 140, 0.95);
+  font: 500 0.78rem/1.35 "Cascadia Mono", "Consolas", monospace;
+}
+
+/* ── Calendar view ── */
+
+.nano-panel-calendar {
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  padding: 12px 16px 16px;
+}
+
+.calendar-error {
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 120, 120, 0.35);
+  border-radius: 10px;
+  background: rgba(120, 20, 20, 0.28);
+  color: rgba(255, 190, 190, 0.95);
+  font: 500 0.82rem/1.4 "Cascadia Mono", Consolas, monospace;
+}
+
+.calendar-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.calendar-toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.calendar-toolbar-row--primary {
+  justify-content: space-between;
+}
+
+.calendar-toolbar-row--nav {
+  justify-content: center;
+}
+
+.calendar-toolbar-row--nav .calendar-nav {
+  width: 100%;
+}
+
+.calendar-toolbar-row--views {
+  justify-content: center;
+}
+
+.calendar-lang-toggle {
+  display: inline-flex;
+  padding: 4px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.calendar-lang-btn {
+  min-width: 42px;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font: 700 0.78rem/1.2 "Cascadia Mono", "Consolas", monospace;
+  cursor: pointer;
+  transform: none;
+  filter: none;
+}
+
+.calendar-lang-btn.active {
+  background: rgba(57, 255, 20, 0.12);
+  color: var(--accent-strong);
+}
+
+.calendar-lang-btn:hover {
+  transform: none;
+  filter: none;
+}
+
+.calendar-picker {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.calendar-picker-toggle {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 44px 8px 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background-color: rgba(0, 0, 0, 0.35);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' stroke='%23b5ffd0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  background-size: 12px 8px;
+  color: var(--text-primary);
+  font: 500 0.86rem/1.2 "Cascadia Mono", "Consolas", monospace;
+  text-align: left;
+  cursor: pointer;
+  transform: none;
+  filter: none;
+}
+
+.calendar-picker-toggle:hover:not(:disabled) {
+  transform: none;
+  filter: none;
+  border-color: rgba(57, 255, 20, 0.28);
+  background-color: rgba(57, 255, 20, 0.05);
+}
+
+.calendar-picker.is-open .calendar-picker-toggle {
+  border-color: rgba(57, 255, 20, 0.34);
+  background-color: rgba(57, 255, 20, 0.08);
+}
+
+.calendar-picker-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-picker-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 280px;
+  padding: 6px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(6, 12, 8, 0.98), rgba(2, 6, 4, 0.96));
+  box-shadow: var(--shadow);
+  overflow: auto;
+}
+
+.calendar-picker-menu[hidden] {
+  display: none !important;
+}
+
+.calendar-picker-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font: 500 0.82rem/1.3 "Cascadia Mono", "Consolas", monospace;
+  text-align: left;
+  cursor: pointer;
+  transform: none;
+  filter: none;
+}
+
+.calendar-picker-option--colored::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--calendar-picker-color);
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.calendar-picker-option:hover {
+  transform: none;
+  filter: none;
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.calendar-picker-option.active {
+  background: rgba(57, 255, 20, 0.12);
+  border-color: rgba(57, 255, 20, 0.24);
+  color: var(--accent-strong);
+}
+
+.calendar-picker-toggle:disabled,
+.calendar-picker-option:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  filter: none;
+}
+
+.calendar-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.calendar-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--accent-soft);
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+  transform: none;
+  filter: none;
+}
+
+.calendar-nav-btn:hover {
+  transform: none;
+  filter: none;
+  border-color: rgba(57, 255, 20, 0.34);
+  background: rgba(57, 255, 20, 0.08);
+}
+
+.calendar-today-btn {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  font: 600 0.76rem/1.2 "Cascadia Mono", "Consolas", monospace;
+  cursor: pointer;
+  transform: none;
+  filter: none;
+  white-space: nowrap;
+}
+
+.calendar-today-btn:hover:not(:disabled) {
+  transform: none;
+  filter: none;
+  border-color: rgba(57, 255, 20, 0.34);
+  background: rgba(57, 255, 20, 0.08);
+  color: var(--accent-strong);
+}
+
+.calendar-today-btn.is-active,
+.calendar-today-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  transform: none;
+  filter: none;
+}
+
+.calendar-period-label {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  color: var(--text-primary);
+  font: 600 1rem/1.2 "Cascadia Mono", "Consolas", monospace;
+}
+
+.calendar-view-toggle {
+  display: inline-flex;
+  padding: 4px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.calendar-view-btn {
+  min-width: 72px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font: 600 0.78rem/1.2 "Cascadia Mono", "Consolas", monospace;
+  cursor: pointer;
+}
+
+.calendar-view-btn.active {
+  background: rgba(57, 255, 20, 0.12);
+  color: var(--accent-strong);
+}
+
+.calendar-view-btn:disabled,
+.calendar-nav-btn:disabled,
+.calendar-today-btn:disabled,
+.calendar-picker-toggle:disabled {
+  opacity: 0.45;
+  cursor: wait;
+  transform: none;
+  filter: none;
+}
+
+.calendar-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  min-height: 0;
+  flex: 1;
+  position: relative;
+}
+
+.calendar-content.is-loading {
+  pointer-events: none;
+}
+
+.calendar-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(57, 255, 20, 0.22);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(2, 8, 4, 0.92), rgba(0, 0, 0, 0.88)),
+    repeating-linear-gradient(
+      0deg,
+      rgba(57, 255, 20, 0.03) 0,
+      rgba(57, 255, 20, 0.03) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+  backdrop-filter: blur(2px);
+}
+
+.calendar-loading[hidden] {
+  display: none !important;
+}
+
+.calendar-loading-core {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+}
+
+.calendar-loading-rings {
+  position: relative;
+  width: 72px;
+  height: 72px;
+}
+
+.calendar-loading-ring {
+  position: absolute;
+  inset: 0;
+  border: 2px solid rgba(57, 255, 20, 0.14);
+  border-top-color: var(--accent);
+  border-right-color: rgba(57, 255, 20, 0.55);
+  border-radius: 50%;
+  animation: calendar-spin 0.9s linear infinite;
+}
+
+.calendar-loading-ring--delay {
+  inset: 10px;
+  border-top-color: rgba(181, 255, 208, 0.85);
+  border-right-color: rgba(57, 255, 20, 0.2);
+  animation-direction: reverse;
+  animation-duration: 1.2s;
+}
+
+.calendar-loading-label {
+  margin: 0;
+  color: var(--accent-strong);
+  font: 700 0.82rem/1.2 "Cascadia Mono", "Consolas", monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  animation: calendar-pulse 1.4s ease-in-out infinite;
+}
+
+.calendar-loading-detail {
+  margin: 0;
+  color: var(--text-muted);
+  font: 500 0.72rem/1.3 "Cascadia Mono", "Consolas", monospace;
+  letter-spacing: 0.08em;
+  text-transform: lowercase;
+}
+
+@keyframes calendar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes calendar-pulse {
+  0%,
+  100% {
+    opacity: 0.72;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+.calendar-grid {
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.24);
+  overflow: hidden;
+}
+
+.calendar-grid-week,
+.calendar-grid-day,
+.calendar-grid-month,
+.calendar-day-column {
+  min-height: 420px;
+}
+
+.calendar-grid.is-loading {
+  opacity: 0.65;
+}
+
+.calendar-grid-month {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-rows: auto repeat(6, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  width: 100%;
+}
+
+.calendar-weekday {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  font: 600 0.68rem/1.2 "Cascadia Mono", "Consolas", monospace;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.calendar-grid-month .calendar-day {
+  gap: 4px;
+  padding: 6px 8px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.calendar-day {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transform: none;
+  filter: none;
+}
+
+.calendar-day:hover {
+  background: rgba(57, 255, 20, 0.05);
+  transform: none;
+  filter: none;
+}
+
+.calendar-day.is-outside {
+  opacity: 0.45;
+}
+
+.calendar-day.is-today {
+  background: rgba(57, 255, 20, 0.08);
+  border-color: rgba(57, 255, 20, 0.28);
+}
+
+.calendar-day.is-today .calendar-day-number {
+  color: var(--accent-strong);
+}
+
+.calendar-day-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  font: 600 0.82rem/1 "Cascadia Mono", "Consolas", monospace;
+}
+
+.calendar-day-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.calendar-event-chip,
+.calendar-event-more {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 5px;
+  border-radius: 5px;
+  font: 500 0.68rem/1.2 "Cascadia Mono", "Consolas", monospace;
+}
+
+.calendar-event-chip {
+  background: rgba(57, 255, 20, 0.12);
+  color: var(--accent-soft);
+}
+
+.calendar-event-more {
+  color: var(--text-muted);
+}
+
+.calendar-grid-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  min-height: 420px;
+}
+
+.calendar-week-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.calendar-week-column:last-child {
+  border-right: none;
+}
+
+.calendar-week-column.is-today .calendar-weekday-date {
+  color: #041207;
+  background: var(--accent-strong);
+}
+
+.calendar-week-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 74px;
+  margin: 0;
+  padding: 12px 8px;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: none;
+  box-sizing: border-box;
+  transform: none;
+  filter: none;
+}
+
+.calendar-week-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+  transform: none;
+  filter: none;
+}
+
+.calendar-weekday-name {
+  font: 600 0.72rem/1.2 "Cascadia Mono", "Consolas", monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.calendar-weekday-date {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 5px;
+  font: 700 1.1rem/1 "Cascadia Mono", "Consolas", monospace;
+}
+
+.calendar-week-events {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  overflow: auto;
+}
+
+.calendar-week-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font: 500 0.75rem/1.3 "Cascadia Mono", "Consolas", monospace;
+}
+
+.calendar-week-event {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid rgba(57, 255, 20, 0.16);
+  border-radius: 8px;
+  background: rgba(57, 255, 20, 0.08);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.calendar-week-event-time {
+  color: var(--accent-soft);
+  font: 600 0.68rem/1.2 "Cascadia Mono", "Consolas", monospace;
+}
+
+.calendar-week-event-title {
+  font: 500 0.76rem/1.3 "Cascadia Mono", "Consolas", monospace;
+}
+
+.calendar-grid-day {
+  display: flex;
+  flex-direction: column;
+  min-height: 420px;
+}
+
+.calendar-day-column {
+  display: flex;
+  flex-direction: column;
+  min-height: 420px;
+  min-width: 0;
+}
+
+.calendar-day-column.is-today .calendar-day-view-date {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 5px;
+  color: var(--accent-strong);
+  background: rgba(57, 255, 20, 0.08);
+}
+
+.calendar-day-view-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.calendar-day-view-weekday {
+  font: 600 0.72rem/1.2 "Cascadia Mono", "Consolas", monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.calendar-day-view-date {
+  font: 700 1.15rem/1.2 "Cascadia Mono", "Consolas", monospace;
+  color: var(--text-primary);
+}
+
+.calendar-day-view-events {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  overflow: auto;
+}
+
+.calendar-day-view-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font: 500 0.8rem/1.3 "Cascadia Mono", "Consolas", monospace;
+}
+
+.calendar-day-view-event {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid rgba(57, 255, 20, 0.16);
+  border-radius: 8px;
+  background: rgba(57, 255, 20, 0.08);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.calendar-day-view-event-time {
+  color: var(--accent-soft);
+  font: 600 0.72rem/1.2 "Cascadia Mono", "Consolas", monospace;
+}
+
+.calendar-day-view-event-title {
+  font: 500 0.82rem/1.35 "Cascadia Mono", "Consolas", monospace;
+}
+
+.calendar-day-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.calendar-day-modal[hidden] {
+  display: none !important;
+}
+
+.calendar-day-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.74);
+  backdrop-filter: blur(2px);
+}
+
+.calendar-day-modal-panel {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(100%, 520px);
+  min-width: min(100%, 360px);
+  max-height: min(82vh, 640px);
+  padding: 20px 22px 22px;
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(6, 12, 8, 0.98), rgba(2, 6, 4, 0.96));
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.calendar-day-modal-panel--event {
+  width: min(100%, 620px);
+  min-width: min(100%, 460px);
+  padding: 28px 32px 32px;
+  gap: 0;
+}
+
+.calendar-day-modal-panel--event .calendar-day-modal-layout {
+  align-items: flex-start;
+  flex: 0 0 auto;
+}
+
+.calendar-day-modal-layout {
+  display: flex;
+  align-items: stretch;
+  gap: 20px;
+  min-height: 0;
+  flex: 1;
+}
+
+.calendar-day-modal-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  flex: 1;
+}
+
+.calendar-day-modal-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  flex-shrink: 0;
+  width: 40px;
+}
+
+.calendar-day-modal-panel--event .calendar-day-modal-rail {
+  width: 72px;
+}
+
+.calendar-day-modal-rail-extras {
+  display: none;
+  width: 100%;
+}
+
+.calendar-day-modal-panel--event .calendar-day-modal-rail-extras {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.calendar-day-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.calendar-day-close {
+  flex-shrink: 0;
+}
+
+.calendar-day-title {
+  margin: 0;
+  min-width: 0;
+  flex: 1;
+  color: var(--text-primary);
+  font: 600 1rem/1.35 "Cascadia Mono", "Consolas", monospace;
+}
+
+.calendar-day-modal-panel--event .calendar-day-title {
+  font-size: 1.25rem;
+  line-height: 1.3;
+}
+
+.calendar-day-events {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: auto;
+  min-height: 0;
+}
+
+.calendar-day-events--single {
+  gap: 18px;
+}
+
+.calendar-event-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 2px 0;
+}
+
+.calendar-event-detail-date {
+  margin: 0;
+  color: var(--text-primary);
+  font: 600 0.95rem/1.4 "Cascadia Mono", "Consolas", monospace;
+}
+
+.calendar-event-detail-time {
+  margin: 0;
+  color: var(--accent-soft);
+  font: 600 0.9rem/1.35 "Cascadia Mono", "Consolas", monospace;
+}
+
+.calendar-day-modal-panel--event .calendar-event-detail-date {
+  font-size: 1.05rem;
+}
+
+.calendar-day-modal-panel--event .calendar-event-detail-time {
+  font-size: 1rem;
+}
+
+.calendar-day-event {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.calendar-day-event-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.calendar-day-event-time {
+  color: var(--accent-soft);
+  font: 600 0.72rem/1.2 "Cascadia Mono", "Consolas", monospace;
+}
+
+.calendar-day-event-title {
+  color: var(--text-primary);
+  font: 500 0.82rem/1.35 "Cascadia Mono", "Consolas", monospace;
+}
+
+.calendar-day-event-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border: 1px solid rgba(57, 255, 20, 0.22);
+  border-radius: 8px;
+  background: rgba(57, 255, 20, 0.08);
+  color: var(--accent-strong);
+  text-decoration: none;
+  transform: none;
+  filter: none;
+  padding: 0;
+}
+
+.calendar-day-event-link svg {
+  width: 16px;
+  height: 16px;
+}
+
+.calendar-day-event-link:hover {
+  transform: none;
+  filter: none;
+  border-color: rgba(57, 255, 20, 0.4);
+  background: rgba(57, 255, 20, 0.14);
+}
+
+.calendar-day-event-link--hero {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+}
+
+.calendar-day-event-link--hero svg {
+  width: 28px;
+  height: 28px;
+}
+
+.calendar-day-empty {
+  color: var(--text-muted);
+  font: 500 0.78rem/1.3 "Cascadia Mono", "Consolas", monospace;
+}
+
+@media (max-width: 900px) {
+  .calendar-grid-week,
+  .calendar-grid-day,
+  .calendar-grid-month,
+  .calendar-day-column {
+    min-height: 360px;
+  }
+}

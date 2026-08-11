@@ -1,0 +1,571 @@
+<!doctype html>
+
+<html lang="en">
+
+<head>
+
+<meta charset="utf-8" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<title>Nano</title>
+
+<link rel="icon" href="./static/favicon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="./static/favicon.svg" />
+
+<link rel="stylesheet" href="./static/home.css?v=active-timers-7" />
+<link rel="stylesheet" href="./static/nano-settings.css?v=1" />
+
+<script src="./config.js"></script>
+<script defer src="./static/nano-api.js?v=1"></script>
+<script defer src="./static/nano-settings.js?v=1"></script>
+<script defer src="./static/three.min.js?v=0.160.1"></script>
+<script defer src="./static/essence_visualizer.js?v=idle-essence-3"></script>
+<script type="module" src="./static/home-entry.js?v=module-entry-6"></script>
+
+</head>
+
+<body>
+
+<main class="shell">
+
+<header class="top-zone">
+
+<p id="activity-status" class="activity-status" aria-live="polite" hidden>
+
+<span class="activity-status-text"></span>
+
+<span class="activity-cursor" aria-hidden="true">|</span>
+
+</p>
+
+<div class="response-zone">
+<h1 id="answer-output" class="response-headline empty"></h1>
+</div>
+
+<div class="sr-only" id="state-line">standby</div>
+
+</header>
+
+<p id="user-speech" class="user-speech" aria-live="polite" hidden>
+
+<span class="user-speech-label">You said</span>
+
+<span class="user-speech-text"></span>
+
+</p>
+
+<div id="active-timers" class="active-timers" hidden aria-live="off"></div>
+
+<section class="essence-zone" aria-hidden="true">
+
+<div id="task-wait-timer" class="task-wait-timer" hidden aria-live="polite">
+<span class="task-wait-label"></span>
+<span class="task-wait-clock"></span>
+</div>
+
+<div class="essence-canvas-wrap">
+
+<canvas id="essence-canvas"></canvas>
+
+</div>
+
+</section>
+
+<div id="controls-reveal-zone" class="controls-reveal-zone" hidden>
+
+<button id="controls-reveal" class="controls-reveal" type="button">
+
+Show controls
+
+</button>
+
+</div>
+
+<div id="commands-reveal-zone" class="commands-reveal-zone" hidden>
+
+<button
+
+id="commands-toggle-reveal"
+
+class="commands-reveal bottom-bar-btn"
+
+type="button"
+
+aria-expanded="false"
+
+aria-controls="view-modal-panel"
+
+>
+
+<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+
+<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"></path>
+
+<circle cx="4" cy="14" r="2"></circle>
+
+<circle cx="12" cy="12" r="2"></circle>
+
+<circle cx="20" cy="16" r="2"></circle>
+
+</svg>
+
+<span class="sr-only">Commands</span>
+
+</button>
+
+</div>
+
+<section id="keyboard-panel" class="keyboard-panel" hidden>
+
+<label class="sr-only" for="message">Message for Nano</label>
+
+<textarea
+
+id="message"
+
+placeholder="Type to Nano... (Enter to send)"
+
+rows="3"
+
+></textarea>
+
+<div class="keyboard-actions">
+
+<button id="send" type="button">Send</button>
+
+</div>
+
+<p id="reply-status" class="reply-status"></p>
+
+</section>
+
+<div id="view-modal" class="view-modal" aria-hidden="true">
+
+<div
+
+id="view-modal-panel"
+
+class="view-modal-panel"
+
+role="dialog"
+
+aria-modal="true"
+
+aria-labelledby="view-modal-title"
+
+>
+
+<header class="view-modal-header">
+
+<h2 id="view-modal-title" class="view-modal-title">Brains</h2>
+
+<button id="view-modal-close" class="ghost chrome-close-btn" type="button" aria-label="Close">
+
+<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+
+<path d="M6 6l12 12M18 6L6 18"></path>
+
+</svg>
+
+</button>
+
+</header>
+
+<div class="view-modal-body">
+
+<div id="nano-panel-brains" class="view-panel nano-panel active">
+
+<div class="nano-panel-toolbar">
+
+<span class="nano-panel-label">Activity log</span>
+
+<button id="brains-clear" class="ghost panel-action" type="button">
+
+Clear
+
+</button>
+
+</div>
+
+<textarea
+
+id="activity-log"
+
+class="terminal"
+
+readonly
+
+spellcheck="false"
+
+placeholder="No internal activity yet."
+
+></textarea>
+
+</div>
+
+<div id="nano-panel-plans" class="view-panel nano-panel nano-panel-plans" hidden>
+
+<div class="nano-panel-toolbar">
+
+<span class="nano-panel-label">
+
+Improvement plans
+
+<span id="plans-tab-count" class="plans-tab-count" hidden aria-label="Pending plans">0</span>
+
+</span>
+
+</div>
+
+<div id="plans-list" class="plans-list" role="list"></div>
+
+<div id="plan-reader" class="plan-reader" hidden>
+
+<header class="plan-reader-header">
+
+<h3 id="plan-reader-title"></h3>
+
+<button id="plan-copy-button" class="plan-copy-button" type="button" aria-label="Copy plan" disabled>
+
+<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+
+<rect x="9" y="9" width="13" height="13" rx="2"></rect>
+
+<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+
+</svg>
+
+<span class="sr-only">Copy plan</span>
+
+</button>
+
+</header>
+
+<pre id="plan-reader-body" class="plan-reader-body"></pre>
+
+<div class="plan-reader-actions">
+<button id="plan-process-button" class="plan-process-button" type="button">
+
+Mark as processed
+
+</button>
+
+<button id="plan-implement-button" class="plan-implement-button" type="button">
+
+Implement
+
+</button>
+
+<button id="plan-reset-button" class="plan-reset-button" type="button" hidden>
+
+Reset
+
+</button>
+
+</div>
+
+<p id="plan-reader-status" class="plan-reader-status" hidden></p>
+
+</div>
+
+</div>
+
+<div id="nano-panel-storage" class="view-panel nano-panel" hidden>
+
+<div class="nano-panel-toolbar">
+
+<span class="nano-panel-label">Storage snapshot</span>
+
+</div>
+
+<textarea
+
+id="storage-log"
+
+class="terminal"
+
+readonly
+
+spellcheck="false"
+
+placeholder="No storage snapshot loaded yet."
+
+></textarea>
+
+</div>
+
+<div id="nano-panel-calendar" class="view-panel nano-panel nano-panel-calendar" hidden>
+
+<div id="calendar-error" class="calendar-error" hidden></div>
+
+<div class="calendar-toolbar">
+
+<div class="calendar-toolbar-row calendar-toolbar-row--primary">
+
+<div class="calendar-picker" id="calendar-picker">
+
+<button id="calendar-picker-toggle" class="calendar-picker-toggle" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="Calendar">
+
+<span id="calendar-picker-label" class="calendar-picker-label"></span>
+
+</button>
+
+<div id="calendar-picker-menu" class="calendar-picker-menu" role="listbox" hidden></div>
+
+</div>
+
+<div class="calendar-lang-toggle" role="group" aria-label="Calendar language">
+
+<button id="calendar-lang-en" class="calendar-lang-btn active" type="button" aria-pressed="true">EN</button>
+
+<button id="calendar-lang-fi" class="calendar-lang-btn" type="button" aria-pressed="false">FI</button>
+
+</div>
+
+</div>
+
+<div class="calendar-toolbar-row calendar-toolbar-row--nav">
+
+<div class="calendar-nav">
+
+<button id="calendar-prev" class="calendar-nav-btn" type="button" aria-label="Previous">‹</button>
+
+<button id="calendar-today" class="calendar-today-btn" type="button">Today</button>
+
+<h3 id="calendar-period-label" class="calendar-period-label"></h3>
+
+<button id="calendar-next" class="calendar-nav-btn" type="button" aria-label="Next">›</button>
+
+</div>
+
+</div>
+
+<div class="calendar-toolbar-row calendar-toolbar-row--views">
+
+<div class="calendar-view-toggle" role="tablist" aria-label="Calendar view">
+
+<button id="calendar-view-month" class="calendar-view-btn active" type="button" role="tab" aria-selected="true">Month</button>
+
+<button id="calendar-view-week" class="calendar-view-btn" type="button" role="tab" aria-selected="false">Week</button>
+
+<button id="calendar-view-day" class="calendar-view-btn" type="button" role="tab" aria-selected="false">Day</button>
+
+</div>
+
+</div>
+
+</div>
+
+<div id="calendar-content" class="calendar-content">
+
+<div id="calendar-loading" class="calendar-loading" hidden aria-live="polite" aria-busy="true">
+
+<div class="calendar-loading-core">
+
+<div class="calendar-loading-rings" aria-hidden="true">
+
+<span class="calendar-loading-ring"></span>
+
+<span class="calendar-loading-ring calendar-loading-ring--delay"></span>
+
+</div>
+
+<p id="calendar-loading-label" class="calendar-loading-label">SYNCING CALENDAR</p>
+
+<p id="calendar-loading-detail" class="calendar-loading-detail">fetching events...</p>
+
+</div>
+
+</div>
+
+<div id="calendar-grid" class="calendar-grid" role="grid" aria-label="Calendar"></div>
+
+<div id="calendar-day-modal" class="calendar-day-modal" hidden>
+
+<div class="calendar-day-modal-backdrop" data-calendar-day-close></div>
+
+<div class="calendar-day-modal-panel" role="dialog" aria-modal="true" aria-labelledby="calendar-day-title" tabindex="-1">
+
+<div class="calendar-day-modal-layout">
+
+<div class="calendar-day-modal-main">
+
+<header class="calendar-day-modal-header">
+
+<h4 id="calendar-day-title" class="calendar-day-title"></h4>
+
+</header>
+
+<ul id="calendar-day-events" class="calendar-day-events"></ul>
+
+</div>
+
+<aside class="calendar-day-modal-rail">
+
+<button id="calendar-day-close" class="calendar-day-close ghost chrome-close-btn" type="button" aria-label="Close">
+
+<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+
+<path d="M6 6l12 12M18 6L6 18"></path>
+
+</svg>
+
+</button>
+
+<div class="calendar-day-modal-rail-extras"></div>
+
+</aside>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<div id="view-panel-commands" class="view-panel view-panel-commands" hidden>
+
+<section class="commands-voice-settings" aria-label="Voice settings">
+<div class="commands-voice-header">
+<h3 class="commands-group-title">Voice</h3>
+<span id="voice-volume-value" class="voice-volume-value">80%</span>
+</div>
+<label class="voice-volume-label" for="voice-volume">Volume</label>
+<input
+id="voice-volume"
+class="voice-volume"
+type="range"
+min="0"
+max="100"
+step="1"
+value="80"
+/>
+</section>
+
+<div id="commands-list" class="commands-list"></div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<footer class="footer-cluster">
+
+<button id="keyboard-toggle" class="keyboard-toggle" type="button">
+
+<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+
+<rect x="2" y="6" width="20" height="12" rx="2"></rect>
+
+<path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"></path>
+
+</svg>
+
+<span>Use Keyboard</span>
+
+</button>
+
+<nav class="bottom-bar" aria-label="Nano controls">
+
+<button
+
+id="voice-push-toggle"
+
+class="bottom-bar-btn voice-push-toggle"
+
+type="button"
+
+aria-pressed="false"
+
+>
+
+<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+
+<path d="M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3z"></path>
+
+<path d="M19 11a7 7 0 0 1-14 0"></path>
+
+<path d="M12 18v3"></path>
+
+</svg>
+
+<span class="sr-only">Hold to talk</span>
+
+</button>
+
+<button
+
+id="nano-controls-toggle"
+
+class="bottom-bar-btn"
+
+type="button"
+
+aria-expanded="false"
+
+aria-controls="view-modal-panel"
+
+>
+
+<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+
+<rect x="4" y="4" width="16" height="16" rx="2"></rect>
+
+<path d="M8 10h8M8 14h5"></path>
+
+</svg>
+
+<span class="sr-only">Nano controls</span>
+
+</button>
+
+<button
+
+id="commands-toggle"
+
+class="bottom-bar-btn"
+
+type="button"
+
+aria-expanded="false"
+
+aria-controls="view-modal-panel"
+
+>
+
+<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+
+<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"></path>
+
+<circle cx="4" cy="14" r="2"></circle>
+
+<circle cx="12" cy="12" r="2"></circle>
+
+<circle cx="20" cy="16" r="2"></circle>
+
+</svg>
+
+<span class="sr-only">Commands</span>
+
+</button>
+
+</nav>
+
+</footer>
+
+</main>
+
+<p id="voice-status" class="sr-only">Voice on standby.</p>
+
+<audio id="voice-audio" hidden preload="none"></audio>
+
+</body>
+
+</html>
