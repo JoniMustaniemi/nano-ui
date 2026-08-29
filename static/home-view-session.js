@@ -88,12 +88,6 @@ function setViewModalExpanded(expanded) {
       expanded && activeView === "commands" ? "true" : "false"
     );
   }
-  if (commandsToggleReveal) {
-    commandsToggleReveal.setAttribute(
-      "aria-expanded",
-      expanded && activeView === "commands" ? "true" : "false"
-    );
-  }
   if (nanoControlsToggle) {
     nanoControlsToggle.setAttribute(
       "aria-expanded",

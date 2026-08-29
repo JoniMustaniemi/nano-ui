@@ -228,6 +228,7 @@ function applyStatusSnapshot(snapshot) {
   hydrateLocalStopwatchesFromSnapshot(snapshot);
   syncActiveTimers(extractCountdownTimersFromSnapshot(snapshot));
   renderState();
+  applySystemMetrics(snapshot.system);
 }
 
 function formatTaskWaitClock(seconds) {
@@ -373,15 +374,93 @@ function isTimerActivitySource(source) {
   );
 }
 
+function resolveTimerStartedAtMs(timer) {
+  if (timer?.startedAtMs != null && !Number.isNaN(Number(timer.startedAtMs))) {
+    return Number(timer.startedAtMs);
+  }
+  const parsed = Date.parse(timer?.started_at || timer?.created_at || "");
+  if (!Number.isNaN(parsed)) {
+    return parsed;
+  }
+  if (timer?.elapsed_seconds != null) {
+    const elapsedSeconds = Math.max(0, Math.floor(Number(timer.elapsed_seconds)));
+    return Date.now() - elapsedSeconds * 1000;
+  }
+  return Number.NaN;
+}
+
 function getTimerAnnouncementKey(timer) {
-  if (timer?.id !== undefined && timer?.id !== null && String(timer.id).trim()) {
-    return String(timer.id);
+  if (!timer) {
+    return "";
+  }
+  if (timer.storageKey) {
+    return timer.storageKey;
+  }
+  const id = String(timer.id || "").trim();
+  if (id) {
+    return id;
+  }
+  const startedAtMs = resolveTimerStartedAtMs(timer);
+  if (!Number.isNaN(startedAtMs) && (timer.started_at || timer.created_at || timer.startedAtMs != null)) {
+    return `stopwatch:${timer.label || "Stopwatch"}:${startedAtMs}`;
+  }
+  if (timer?.elapsed_seconds != null) {
+    return `stopwatch:${timer.label || "Stopwatch"}:elapsed:${Math.max(0, Math.floor(Number(timer.elapsed_seconds)))}`;
+  }
+  if (!Number.isNaN(startedAtMs)) {
+    return `stopwatch:${timer.label || "Stopwatch"}:${startedAtMs}`;
+  }
+  return `stopwatch:${timer.label || "Stopwatch"}:unknown`;
+}
+
+function computeStopwatchStorageKey(stopwatch, serverTimer = stopwatch) {
+  const id = String(stopwatch?.id || serverTimer?.id || "").trim();
+  if (id) {
+    return id;
+  }
+  const startedAt = serverTimer?.started_at || serverTimer?.created_at || stopwatch?.started_at || "";
+  const parsed = Date.parse(startedAt);
+  if (!Number.isNaN(parsed)) {
+    return `stopwatch:${stopwatch?.label || "Stopwatch"}:${parsed}`;
+  }
+  const elapsed = serverTimer?.elapsed_seconds ?? stopwatch?.elapsed_seconds;
+  if (elapsed != null) {
+    return `stopwatch:${stopwatch?.label || "Stopwatch"}:elapsed:${Math.max(0, Math.floor(Number(elapsed)))}`;
+  }
+  return getTimerAnnouncementKey(stopwatch);
+}
+
+function getStopwatchStoppedKeys(timer) {
+  const keys = new Set();
+  if (!timer) {
+    return keys;
+  }
+  if (timer.storageKey) {
+    keys.add(timer.storageKey);
+  }
+  const id = String(timer.id || "").trim();
+  if (id) {
+    keys.add(id);
+  }
+  const startedAtMs = resolveTimerStartedAtMs(timer);
+  if (!Number.isNaN(startedAtMs)) {
+    keys.add(`stopwatch:${timer.label || "Stopwatch"}:${startedAtMs}`);
   }
   const startedAt = timer?.started_at || timer?.created_at || "";
-  if (timer?.startedAtMs != null && !Number.isNaN(Number(timer.startedAtMs))) {
-    return `stopwatch:${timer?.label || "Stopwatch"}:${timer.startedAtMs}`;
+  const parsed = Date.parse(startedAt);
+  if (!Number.isNaN(parsed)) {
+    keys.add(`stopwatch:${timer.label || "Stopwatch"}:${parsed}`);
   }
-  return `${timer?.kind || "timer"}:${timer?.label || ""}:${startedAt}:${timer?.due_at || ""}`;
+  if (timer?.elapsed_seconds != null) {
+    keys.add(
+      `stopwatch:${timer.label || "Stopwatch"}:elapsed:${Math.max(0, Math.floor(Number(timer.elapsed_seconds)))}`,
+    );
+  }
+  return keys;
+}
+
+function getStopwatchStateKeys(timer) {
+  return getStopwatchStoppedKeys(timer);
 }
 
 function isStopwatchStartMessage(message) {
@@ -405,6 +484,14 @@ function isStopwatchStopMessage(message) {
     .toLowerCase()
     .replace(/\bstop\s+watch(?:es)?\b/g, "stopwatch");
   return /\bstopwatch\b/.test(lowered) && /\b(?:stop|cancel|delete|remove|clear|end|kill)\b/.test(lowered);
+}
+
+function isClearAllTimersCommand(command) {
+  return String(command?.id || "").trim().toLowerCase() === "clear_all_timers";
+}
+
+function isClearAllTimersMessage(message) {
+  return /\bclear\s+all\s+timers?\b/i.test(String(message || ""));
 }
 
 function parseStopwatchLabel(message) {
@@ -460,13 +547,37 @@ function markStopwatchStopped(timer) {
   if (!timer) {
     return;
   }
-  stoppedStopwatchKeys.add(getTimerAnnouncementKey(timer));
-  if (timer.id !== undefined && timer.id !== null && String(timer.id).trim()) {
-    stoppedStopwatchKeys.add(String(timer.id));
+  const id = String(timer?.id || timer?.serverSource?.id || "").trim();
+  if (id && !id.startsWith("local-stopwatch-")) {
+    stoppedStopwatchIds.add(id);
   }
-  if (timer.startedAtMs != null && !Number.isNaN(Number(timer.startedAtMs))) {
-    stoppedStopwatchKeys.add(`stopwatch:${timer.label || "Stopwatch"}:${timer.startedAtMs}`);
+  for (const key of getStopwatchStoppedKeys(timer)) {
+    stoppedStopwatchKeys.add(key);
   }
+  if (timer.serverSource) {
+    for (const key of getStopwatchStoppedKeys(timer.serverSource)) {
+      stoppedStopwatchKeys.add(key);
+    }
+  }
+}
+
+function resolveStopwatchStorageKey(timer) {
+  if (!timer) {
+    return "";
+  }
+  if (timer.storageKey && localStopwatches.has(timer.storageKey)) {
+    return timer.storageKey;
+  }
+  const timerKey = getTimerAnnouncementKey(timer);
+  if (localStopwatches.has(timerKey)) {
+    return timerKey;
+  }
+  for (const [entryKey, stopwatch] of localStopwatches.entries()) {
+    if (getTimerAnnouncementKey(stopwatch) === timerKey) {
+      return entryKey;
+    }
+  }
+  return timerKey;
 }
 
 function clearStopwatchState(timer) {
@@ -474,17 +585,30 @@ function clearStopwatchState(timer) {
     return;
   }
   markStopwatchStopped(timer);
-  const key = getTimerAnnouncementKey(timer);
-  localStopwatches.delete(key);
-  for (const [entryKey, stopwatch] of [...localStopwatches.entries()]) {
-    if (
-      getTimerAnnouncementKey(stopwatch) === key ||
-      (timer.id != null && stopwatch.id === timer.id)
-    ) {
-      markStopwatchStopped(stopwatch);
-      localStopwatches.delete(entryKey);
+  localStopwatches.delete(resolveStopwatchStorageKey(timer));
+}
+
+function restoreStopwatchState(stopwatch, timerKey) {
+  if (!stopwatch) {
+    return;
+  }
+  const id = String(stopwatch?.id || "").trim();
+  if (id) {
+    stoppedStopwatchIds.delete(id);
+  }
+  for (const key of getStopwatchStoppedKeys(stopwatch)) {
+    stoppedStopwatchKeys.delete(key);
+  }
+  if (stopwatch.serverSource) {
+    for (const key of getStopwatchStoppedKeys(stopwatch.serverSource)) {
+      stoppedStopwatchKeys.delete(key);
     }
   }
+  const storageKey = stopwatch.storageKey || resolveStopwatchStorageKey(stopwatch) || timerKey;
+  if (storageKey && !localStopwatches.has(storageKey)) {
+    localStopwatches.set(storageKey, { ...stopwatch });
+  }
+  refreshTimerDisplays();
 }
 
 function resetStopwatchesDisplay() {
@@ -500,11 +624,14 @@ function isStopwatchStopped(timer) {
   if (!timer) {
     return false;
   }
-  if (stoppedStopwatchKeys.has(getTimerAnnouncementKey(timer))) {
+  const id = String(timer?.id || timer?.serverSource?.id || "").trim();
+  if (id && stoppedStopwatchIds.has(id)) {
     return true;
   }
-  if (timer.id !== undefined && timer.id !== null && stoppedStopwatchKeys.has(String(timer.id))) {
-    return true;
+  for (const key of getStopwatchStoppedKeys(timer)) {
+    if (stoppedStopwatchKeys.has(key)) {
+      return true;
+    }
   }
   return false;
 }
@@ -514,10 +641,615 @@ function stopLocalStopwatch(timer) {
     return;
   }
   clearStopwatchState(timer);
-  if (!localStopwatches.size) {
+  if (!getDisplayStopwatches().length) {
     resetStopwatchesDisplay();
   }
   refreshTimerDisplays();
+}
+
+function resolveStopwatchStartedAtMs(serverTimer) {
+  return resolveTimerStartedAtMs(serverTimer);
+}
+
+function buildStopStopwatchMessage(timerOrId) {
+  const id =
+    typeof timerOrId === "object" && timerOrId !== null
+      ? timerOrId?.id != null
+        ? String(timerOrId.id).trim()
+        : ""
+      : String(timerOrId || "").trim();
+  if (id) {
+    return `Stop stopwatch ${id}`;
+  }
+  const timer = typeof timerOrId === "object" && timerOrId !== null ? timerOrId : null;
+  const label = String(timer?.label || "").trim();
+  const defaultLabel = "Stopwatch";
+  if (label && label !== defaultLabel) {
+    return `Stop the stopwatch "${label}"`;
+  }
+  const startedAtMs = resolveTimerStartedAtMs(timer);
+  if (!Number.isNaN(startedAtMs)) {
+    return `Stop the stopwatch started at ${new Date(startedAtMs).toISOString()}`;
+  }
+  return "Stop the stopwatch";
+}
+
+function getTimerDefaultLabel(timer) {
+  return isStopwatchTimer(timer) ? "Stopwatch" : "Timer";
+}
+
+function sanitizeTimerLabel(raw, defaultLabel) {
+  const stripped = String(raw || "")
+    .replace(/[\u0000-\u001F\u007F]/g, "")
+    .trim();
+  if (!stripped) {
+    return defaultLabel;
+  }
+  return stripped.slice(0, 64);
+}
+
+function buildRenameTimerMessage(id, newLabel) {
+  return `Rename timer ${id} to "${newLabel}"`;
+}
+
+function buildRenameStopwatchMessage(id, newLabel) {
+  return `Rename stopwatch ${id} to "${newLabel}"`;
+}
+
+function buildCancelTimerMessage(timerOrId) {
+  const id =
+    typeof timerOrId === "object" && timerOrId !== null
+      ? timerOrId?.id != null
+        ? String(timerOrId.id).trim()
+        : ""
+      : String(timerOrId || "").trim();
+  if (id) {
+    return `Cancel timer ${id}`;
+  }
+  const timer = typeof timerOrId === "object" && timerOrId !== null ? timerOrId : null;
+  const label = String(timer?.label || "").trim();
+  if (label && label !== "Timer") {
+    return `Cancel the timer "${label}"`;
+  }
+  const startedAtMs = resolveTimerStartedAtMs(timer);
+  if (!Number.isNaN(startedAtMs)) {
+    return `Cancel the timer started at ${new Date(startedAtMs).toISOString()}`;
+  }
+  return "Cancel the timer";
+}
+
+async function patchTimerLabel(id, label) {
+  let response;
+  try {
+    response = await nanoFetch(`/api/timers/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ label }),
+    });
+  } catch (error) {
+    throw error;
+  }
+  let data = {};
+  try {
+    data = await response.json();
+  } catch (_error) {
+    if (!response.ok) {
+      throw new Error(`Timer rename failed (${response.status}).`);
+    }
+  }
+  if (!response.ok) {
+    throw new Error(data.detail || `Timer rename failed (${response.status}).`);
+  }
+  return data;
+}
+
+async function patchStopwatchLabel(id, label) {
+  let response;
+  try {
+    response = await nanoFetch(`/api/stopwatches/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ label }),
+    });
+  } catch (error) {
+    throw error;
+  }
+  let data = {};
+  try {
+    data = await response.json();
+  } catch (_error) {
+    if (!response.ok) {
+      throw new Error(`Stopwatch rename failed (${response.status}).`);
+    }
+  }
+  if (!response.ok) {
+    throw new Error(data.detail || `Stopwatch rename failed (${response.status}).`);
+  }
+  return data;
+}
+
+async function deleteTimerById(id) {
+  const normalizedId = id != null ? String(id).trim() : "";
+  if (!normalizedId) {
+    throw new Error("Timer id is required.");
+  }
+  let response;
+  try {
+    response = await nanoFetch(`/api/timers/${encodeURIComponent(normalizedId)}`, {
+      method: "DELETE",
+    });
+  } catch (error) {
+    throw error;
+  }
+  if (response.status === 204) {
+    return;
+  }
+  let data = {};
+  try {
+    data = await response.json();
+  } catch (_error) {
+    if (!response.ok) {
+      throw new Error(`Timer cancel failed (${response.status}).`);
+    }
+    return;
+  }
+  if (!response.ok) {
+    throw new Error(data.detail || `Timer cancel failed (${response.status}).`);
+  }
+}
+
+function createStopwatchApiError(message, status) {
+  const error = new Error(message);
+  error.status = status;
+  return error;
+}
+
+function isStopwatchNotFoundError(error) {
+  return Number(error?.status) === 404;
+}
+
+async function deleteStopwatchById(id) {
+  const normalizedId = id != null ? String(id).trim() : "";
+  if (!normalizedId) {
+    throw new Error("Stopwatch id is required.");
+  }
+  let response;
+  try {
+    response = await nanoFetch(`/api/stopwatches/${encodeURIComponent(normalizedId)}`, {
+      method: "DELETE",
+    });
+  } catch (error) {
+    throw error;
+  }
+  if (response.status === 204) {
+    return;
+  }
+  if (response.status === 404) {
+    let data = {};
+    try {
+      data = await response.json();
+    } catch (_error) {
+      // Ignore parse errors for 404 bodies.
+    }
+    throw createStopwatchApiError(data.detail || "Stopwatch not found.", 404);
+  }
+  let data = {};
+  try {
+    data = await response.json();
+  } catch (_error) {
+    if (!response.ok) {
+      throw createStopwatchApiError(`Stopwatch stop failed (${response.status}).`, response.status);
+    }
+    return;
+  }
+  if (!response.ok) {
+    throw createStopwatchApiError(
+      data.detail || `Stopwatch stop failed (${response.status}).`,
+      response.status,
+    );
+  }
+}
+
+function isCountdownTimerIdActive(timerId) {
+  const normalizedId = timerId != null ? String(timerId).trim() : "";
+  if (!normalizedId) {
+    return false;
+  }
+  return currentActiveTimers.some(
+    (timer) =>
+      !isStopwatchTimer(timer) && timer?.id != null && String(timer.id).trim() === normalizedId,
+  );
+}
+
+function isStopwatchIdActive(stopwatchId) {
+  const normalizedId = stopwatchId != null ? String(stopwatchId).trim() : "";
+  if (!normalizedId) {
+    return false;
+  }
+  return currentServerStopwatches.some(
+    (stopwatch) => stopwatch?.id != null && String(stopwatch.id).trim() === normalizedId,
+  );
+}
+
+async function waitForServerTimerRemoved(timerId) {
+  const normalizedId = timerId != null ? String(timerId).trim() : "";
+  if (!normalizedId) {
+    return false;
+  }
+  for (let attempt = 0; attempt < TIMER_SERVER_SYNC_MAX_ATTEMPTS; attempt += 1) {
+    if (attempt > 0) {
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, TIMER_SERVER_SYNC_POLL_MS);
+      });
+    }
+    await syncRuntimeStatus();
+    if (!isCountdownTimerIdActive(normalizedId)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function waitForServerStopwatchRemoved(stopwatchId) {
+  const normalizedId = stopwatchId != null ? String(stopwatchId).trim() : "";
+  if (!normalizedId) {
+    return false;
+  }
+  for (let attempt = 0; attempt < TIMER_SERVER_SYNC_MAX_ATTEMPTS; attempt += 1) {
+    if (attempt > 0) {
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, TIMER_SERVER_SYNC_POLL_MS);
+      });
+    }
+    await syncRuntimeStatus();
+    if (!isStopwatchIdActive(normalizedId)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function updateCountdownTimerLabel(timerKey, newLabel) {
+  let changed = false;
+  currentActiveTimers = currentActiveTimers.map((timer) => {
+    if (getTimerAnnouncementKey(timer) !== timerKey) {
+      return timer;
+    }
+    changed = true;
+    return { ...timer, label: newLabel };
+  });
+  const expiredSnapshot = expiredTimerSnapshots.get(timerKey);
+  if (expiredSnapshot) {
+    expiredTimerSnapshots.set(timerKey, { ...expiredSnapshot, label: newLabel });
+    changed = true;
+  }
+  if (changed) {
+    refreshTimerDisplays();
+  }
+  return changed;
+}
+
+function updateLocalStopwatchLabel(timerKey, newLabel) {
+  const storageKey = resolveStopwatchStorageKey({ storageKey: timerKey, id: timerKey });
+  const entryKey = localStopwatches.has(storageKey)
+    ? storageKey
+    : localStopwatches.has(timerKey)
+      ? timerKey
+      : null;
+  if (!entryKey) {
+    return false;
+  }
+  const stopwatch = localStopwatches.get(entryKey);
+  if (!stopwatch) {
+    return false;
+  }
+  stopwatch.label = newLabel;
+  if (stopwatch.serverSource) {
+    stopwatch.serverSource = { ...stopwatch.serverSource, label: newLabel };
+  }
+  localStopwatches.set(entryKey, stopwatch);
+  refreshTimerDisplays();
+  return true;
+}
+
+function findCountdownTimerByKey(timerKey) {
+  if (!timerKey) {
+    return null;
+  }
+  return getDisplayCountdownTimers().find((timer) => getTimerAnnouncementKey(timer) === timerKey) || null;
+}
+
+function findCountdownTimerById(timerId) {
+  const normalizedId = timerId != null ? String(timerId).trim() : "";
+  if (!normalizedId) {
+    return null;
+  }
+  return (
+    currentActiveTimers.find((timer) => timer?.id != null && String(timer.id).trim() === normalizedId) ||
+    Array.from(expiredTimerSnapshots.values()).find(
+      (timer) => timer?.id != null && String(timer.id).trim() === normalizedId,
+    ) ||
+    null
+  );
+}
+
+function findCountdownTimerForAction(item) {
+  if (!item) {
+    return null;
+  }
+  const timerFromId = findCountdownTimerById(item.dataset.timerId);
+  if (timerFromId) {
+    return timerFromId;
+  }
+  return findCountdownTimerByKey(item.dataset.timerKey);
+}
+
+function findActiveTimerByKey(timerKey) {
+  return findStopwatchByKey(timerKey) || findCountdownTimerByKey(timerKey);
+}
+
+function createActiveTimerNameElement(timer) {
+  const expired = isTimerExpired(timer);
+  const defaultLabel = getTimerDefaultLabel(timer);
+  const name = expired
+    ? "Time's up"
+    : sanitizeTimerLabel(timer.label, defaultLabel);
+  const nameEl = document.createElement("span");
+  nameEl.className = "active-timer-name";
+  if (!expired && name === defaultLabel) {
+    nameEl.classList.add("active-timer-name--default");
+  }
+  nameEl.textContent = name;
+  if (!expired) {
+    nameEl.setAttribute("role", "button");
+    nameEl.tabIndex = 0;
+    nameEl.setAttribute(
+      "aria-label",
+      isStopwatchTimer(timer) ? "Rename stopwatch" : "Rename timer",
+    );
+  }
+  return nameEl;
+}
+
+function applyActiveTimerNameToItem(item, timer) {
+  if (!item || !item.isConnected || item.classList.contains("active-timer-item--editing")) {
+    return;
+  }
+  const expired = isTimerExpired(timer);
+  const defaultLabel = getTimerDefaultLabel(timer);
+  const name = expired
+    ? "Time's up"
+    : sanitizeTimerLabel(timer.label, defaultLabel);
+  let nameEl = item.querySelector(".active-timer-name");
+  if (!nameEl) {
+    const header = item.querySelector(".active-timer-header");
+    if (!header) {
+      return;
+    }
+    nameEl = createActiveTimerNameElement(timer);
+    header.replaceChildren(nameEl);
+    return;
+  }
+  nameEl.textContent = name;
+  nameEl.classList.toggle("active-timer-name--default", !expired && name === defaultLabel);
+}
+
+function beginActiveTimerNameEdit(item, timerKey) {
+  if (!item || item.classList.contains("active-timer-item--editing")) {
+    return;
+  }
+  const timer = findActiveTimerByKey(timerKey);
+  if (!timer || isTimerExpired(timer)) {
+    return;
+  }
+  const nameEl = item.querySelector(".active-timer-name");
+  if (!nameEl) {
+    return;
+  }
+  const defaultLabel = getTimerDefaultLabel(timer);
+  const currentName = sanitizeTimerLabel(timer.label, defaultLabel);
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "active-timer-name-input";
+  input.value = currentName === defaultLabel ? "" : currentName;
+  input.setAttribute("aria-label", isStopwatchTimer(timer) ? "Stopwatch name" : "Timer name");
+  input.maxLength = 64;
+  item.classList.add("active-timer-item--editing");
+  nameEl.replaceWith(input);
+  input.focus();
+  input.select();
+
+  let finished = false;
+  const finish = (commit) => {
+    if (finished || !item.classList.contains("active-timer-item--editing")) {
+      return;
+    }
+    finished = true;
+    item.classList.remove("active-timer-item--editing");
+    if (commit) {
+      void commitActiveTimerNameEdit(item, timerKey, input);
+    } else {
+      cancelActiveTimerNameEdit(item, timerKey);
+    }
+  };
+
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      finish(true);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      finish(false);
+    }
+  });
+  input.addEventListener("blur", () => {
+    finish(true);
+  });
+}
+
+async function commitActiveTimerNameEdit(item, timerKey, input) {
+  const timer = findActiveTimerByKey(timerKey);
+  if (!timer) {
+    return;
+  }
+  const defaultLabel = getTimerDefaultLabel(timer);
+  const nextName = sanitizeTimerLabel(input.value, defaultLabel);
+  const replacement = createActiveTimerNameElement({ ...timer, label: nextName });
+  if (input.isConnected) {
+    input.replaceWith(replacement);
+  } else if (item.isConnected) {
+    const header = item.querySelector(".active-timer-header");
+    if (header && !header.querySelector(".active-timer-name")) {
+      header.append(replacement);
+    }
+  }
+  if (typeof renameActiveTimer === "function") {
+    await renameActiveTimer(timer, nextName);
+  } else if (isStopwatchTimer(timer)) {
+    updateLocalStopwatchLabel(timerKey, nextName);
+  } else {
+    updateCountdownTimerLabel(timerKey, nextName);
+  }
+  const liveItem = item.isConnected
+    ? item
+    : (activeTimersRoot || activeStopwatchesRoot)?.querySelector(`[data-timer-key="${timerKey}"]`);
+  const refreshedTimer = findActiveTimerByKey(timerKey);
+  if (liveItem && refreshedTimer) {
+    applyActiveTimerNameToItem(liveItem, refreshedTimer);
+  }
+}
+
+function cancelActiveTimerNameEdit(item, timerKey) {
+  const timer = findActiveTimerByKey(timerKey);
+  if (!timer) {
+    return;
+  }
+  const input = item.querySelector(".active-timer-name-input");
+  const replacement = createActiveTimerNameElement(timer);
+  if (input) {
+    input.replaceWith(replacement);
+  }
+}
+
+function handleActiveTimerNameEditTrigger(event) {
+  const nameEl = event.target.closest(".active-timer-name");
+  if (!nameEl || nameEl.getAttribute("role") !== "button") {
+    return;
+  }
+  const item = nameEl.closest("[data-timer-key]");
+  if (!item) {
+    return;
+  }
+  if (event.type === "keydown" && event.key !== "Enter" && event.key !== " ") {
+    return;
+  }
+  if (event.type === "keydown") {
+    event.preventDefault();
+  }
+  if (event.type === "click") {
+    event.preventDefault();
+  }
+  beginActiveTimerNameEdit(item, item.dataset.timerKey);
+}
+
+function bindActiveTimerNameEdit() {
+  for (const root of [activeTimersRoot, activeStopwatchesRoot]) {
+    if (!root || root.dataset.nameEditBound === "true") {
+      continue;
+    }
+    root.dataset.nameEditBound = "true";
+    root.addEventListener("click", handleActiveTimerNameEditTrigger);
+    root.addEventListener("keydown", handleActiveTimerNameEditTrigger);
+  }
+}
+
+function isServerBackedStopwatch(timer) {
+  if (!timer) {
+    return false;
+  }
+  if (timer.serverBacked || timer.serverSource) {
+    return true;
+  }
+  const id = String(timer.id || "").trim();
+  return Boolean(id && !id.startsWith("local-stopwatch-"));
+}
+
+function findStopwatchByKey(timerKey) {
+  if (!timerKey) {
+    return null;
+  }
+  for (const stopwatch of localStopwatches.values()) {
+    if (getTimerAnnouncementKey(stopwatch) === timerKey) {
+      return {
+        ...stopwatch,
+        started_at: new Date(stopwatch.startedAtMs).toISOString(),
+      };
+    }
+  }
+  return getDisplayStopwatches().find((stopwatch) => getTimerAnnouncementKey(stopwatch) === timerKey) || null;
+}
+
+function bindActiveTimerActions() {
+  if (!activeTimersRoot || activeTimersRoot.dataset.actionsBound === "true") {
+    return;
+  }
+  activeTimersRoot.dataset.actionsBound = "true";
+  activeTimersRoot.addEventListener("click", (event) => {
+    const button = event.target.closest(".active-timer-action");
+    if (!button || button.disabled) {
+      return;
+    }
+    const item = button.closest("[data-timer-key]");
+    if (!item) {
+      return;
+    }
+    const timer = findCountdownTimerForAction(item);
+    if (!timer) {
+      return;
+    }
+    const action = button.textContent.trim();
+    if (action === "Cancel") {
+      if (typeof cancelActiveTimer === "function") {
+        void cancelActiveTimer(timer);
+      }
+      return;
+    }
+    if (action === "OK") {
+      okExpiredTimer(timer);
+    }
+  });
+}
+
+function bindActiveStopwatchActions() {
+  if (!activeStopwatchesRoot || activeStopwatchesRoot.dataset.actionsBound === "true") {
+    return;
+  }
+  activeStopwatchesRoot.dataset.actionsBound = "true";
+  activeStopwatchesRoot.addEventListener("click", (event) => {
+    const button = event.target.closest(".active-timer-action");
+    if (!button || button.disabled) {
+      return;
+    }
+    const item = button.closest("[data-timer-key]");
+    if (!item) {
+      return;
+    }
+    const timer = findStopwatchByKey(item.dataset.timerKey);
+    if (!timer) {
+      return;
+    }
+    if (button.textContent.trim() === "Stop") {
+      if (typeof stopActiveStopwatch === "function") {
+        void stopActiveStopwatch(timer);
+      } else {
+        stopLocalStopwatch(timer);
+      }
+    }
+  });
 }
 
 function stopAllLocalStopwatches() {
@@ -525,29 +1257,101 @@ function stopAllLocalStopwatches() {
     markStopwatchStopped(stopwatch);
   }
   localStopwatches.clear();
+  stoppedStopwatchIds.clear();
   resetStopwatchesDisplay();
   refreshTimerDisplays();
 }
 
-function hydrateLocalStopwatchesFromSnapshot(snapshot) {
-  if (localStopwatches.size > 0) {
-    return;
+function clearAllLocalTimerState() {
+  for (const stopwatch of getDisplayStopwatches()) {
+    markStopwatchStopped(stopwatch);
   }
-  for (const timer of extractStopwatchSeedTimers(snapshot)) {
-    if (isStopwatchStopped(timer)) {
+  syncActiveTimers([]);
+  stopAllLocalStopwatches();
+  refreshTimerDisplays();
+}
+
+function pruneOptimisticStopwatchesForServerTimer(serverTimer) {
+  const serverStartedAtMs = resolveTimerStartedAtMs(serverTimer);
+  const label = serverTimer?.label || "Stopwatch";
+  for (const [entryKey, stopwatch] of [...localStopwatches.entries()]) {
+    if (stopwatch.serverBacked) {
       continue;
     }
-    const startedAt = Date.parse(timer.started_at || timer.created_at || "");
-    const stopwatch = createLocalStopwatch({
-      label: timer.label || "Stopwatch",
-      startedAtMs: Number.isNaN(startedAt) ? Date.now() : startedAt,
-    });
-    if (timer.id !== undefined && timer.id !== null) {
-      stopwatch.id = String(timer.id);
+    if ((stopwatch.label || "Stopwatch") !== label) {
+      continue;
     }
-    localStopwatches.set(getTimerAnnouncementKey(stopwatch), stopwatch);
+    if (Number.isNaN(serverStartedAtMs)) {
+      localStopwatches.delete(entryKey);
+      continue;
+    }
+    if (Math.abs(stopwatch.startedAtMs - serverStartedAtMs) <= 15_000) {
+      localStopwatches.delete(entryKey);
+    }
   }
-  if (localStopwatches.size > 0) {
+}
+
+function hydrateLocalStopwatchesFromSnapshot(snapshot) {
+  const serverStopwatches = extractStopwatchSeedTimers(snapshot);
+  currentServerStopwatches = serverStopwatches;
+  if (serverStopwatches.length === 0) {
+    let changed = false;
+    for (const [entryKey, stopwatch] of [...localStopwatches.entries()]) {
+      if (stopwatch.serverBacked) {
+        localStopwatches.delete(entryKey);
+        changed = true;
+      }
+    }
+    if (changed) {
+      refreshTimerDisplays();
+    }
+    return;
+  }
+
+  const serverKeys = new Set();
+  let changed = false;
+
+  for (const serverTimer of serverStopwatches) {
+    if (isStopwatchStopped(serverTimer)) {
+      continue;
+    }
+    const startedAtMs = resolveTimerStartedAtMs(serverTimer);
+    const stopwatch = createLocalStopwatch({
+      label: serverTimer.label || "Stopwatch",
+      startedAtMs: Number.isNaN(startedAtMs) ? Date.now() : startedAtMs,
+    });
+    if (serverTimer.id !== undefined && serverTimer.id !== null) {
+      stopwatch.id = String(serverTimer.id);
+    }
+    stopwatch.serverBacked = true;
+    stopwatch.serverSource = serverTimer;
+    stopwatch.storageKey = computeStopwatchStorageKey(stopwatch, serverTimer);
+    const storageKey = stopwatch.storageKey;
+    serverKeys.add(storageKey);
+    if (localStopwatches.has(storageKey)) {
+      const existing = localStopwatches.get(storageKey);
+      const nextLabel = serverTimer.label || "Stopwatch";
+      if (existing.label !== nextLabel || existing.serverSource !== serverTimer) {
+        existing.label = nextLabel;
+        existing.serverSource = serverTimer;
+        localStopwatches.set(storageKey, existing);
+        changed = true;
+      }
+      continue;
+    }
+    pruneOptimisticStopwatchesForServerTimer(serverTimer);
+    localStopwatches.set(storageKey, stopwatch);
+    changed = true;
+  }
+
+  for (const [entryKey, stopwatch] of [...localStopwatches.entries()]) {
+    if (!serverKeys.has(entryKey) && stopwatch.serverBacked) {
+      localStopwatches.delete(entryKey);
+      changed = true;
+    }
+  }
+
+  if (changed) {
     refreshTimerDisplays();
   }
 }
@@ -619,6 +1423,23 @@ function clearCountdownTimerState(timer, { suppress = false } = {}) {
     ...currentActivitySnapshot,
     active_timers: [...currentActiveTimers],
   };
+}
+
+function restoreCountdownTimerState(timer, timerKey) {
+  if (!timer || isStopwatchTimer(timer)) {
+    return;
+  }
+  const key = timerKey || getTimerAnnouncementKey(timer);
+  dismissedTimerKeys.delete(key);
+  if (!currentActiveTimers.some((entry) => getTimerAnnouncementKey(entry) === key)) {
+    currentActiveTimers = [...currentActiveTimers, timer];
+  }
+  currentActivitySnapshot = {
+    ...currentActivitySnapshot,
+    active_timers: [...currentActiveTimers],
+  };
+  rescheduleTimerExpiries();
+  refreshTimerDisplays();
 }
 
 function pruneOrphanedTimerState(activeKeys) {
@@ -840,7 +1661,6 @@ function refreshTimerDisplays() {
 function refreshActiveTimersDisplay() {
   const displayTimers = getDisplayCountdownTimers();
   document.body.classList.toggle("has-active-timers", displayTimers.length > 0);
-  activeTimersRenderSignature = "";
   displayActiveTimers(displayTimers);
   if (!displayTimers.length) {
     resetCountdownTimersDisplay();
@@ -855,7 +1675,6 @@ function refreshActiveTimersDisplay() {
 function refreshActiveStopwatchesDisplay() {
   const stopwatches = getDisplayStopwatches();
   document.body.classList.toggle("has-active-stopwatches", stopwatches.length > 0);
-  activeStopwatchesRenderSignature = "";
   displayActiveStopwatches(stopwatches);
   if (!stopwatches.length) {
     resetStopwatchesDisplay();
@@ -946,6 +1765,10 @@ function renderActiveTimerItem(timer, { hero = false } = {}) {
   const expired = isTimerExpired(timer);
   item.className = "active-timer-item";
   item.dataset.timerKey = getTimerAnnouncementKey(timer);
+  const timerId = timer?.id != null ? String(timer.id).trim() : "";
+  if (timerId) {
+    item.dataset.timerId = timerId;
+  }
   if (hero) {
     item.classList.add("active-timer-item--hero");
   }
@@ -958,22 +1781,12 @@ function renderActiveTimerItem(timer, { hero = false } = {}) {
     item.classList.add("active-timer-item--overdue");
   }
 
-  const badge = document.createElement("span");
-  badge.className = "active-timer-kind";
-  badge.textContent = expired ? "Time's up" : isStopwatchTimer(timer) ? "Stopwatch" : "Timer";
-
-  const label = (timer.label || "").trim();
-  const defaultLabel = isStopwatchTimer(timer) ? "Stopwatch" : "Timer";
+  const name = sanitizeTimerLabel(timer.label, getTimerDefaultLabel(timer));
+  const defaultLabel = getTimerDefaultLabel(timer);
 
   const header = document.createElement("div");
   header.className = "active-timer-header";
-  header.append(badge);
-  if (label && label !== defaultLabel) {
-    const labelEl = document.createElement("span");
-    labelEl.className = "active-timer-label";
-    labelEl.textContent = label;
-    header.append(labelEl);
-  }
+  header.append(createActiveTimerNameElement(timer));
 
   const clock = document.createElement("span");
   clock.className = "active-timer-clock";
@@ -1031,23 +1844,13 @@ function renderActiveTimerItem(timer, { hero = false } = {}) {
   if (expired) {
     actionButton.textContent = "OK";
     actionButton.setAttribute("aria-label", "Acknowledge timer");
-    actionButton.addEventListener("click", () => {
-      okExpiredTimer(timer);
-    });
   } else {
     actionButton.textContent = isStopwatchTimer(timer) ? "Stop" : "Cancel";
-    actionButton.addEventListener("click", () => {
-      if (isStopwatchTimer(timer)) {
-        stopLocalStopwatch(timer);
-        return;
-      }
-      void cancelActiveTimer(timer);
-    });
   }
   actions.append(actionButton);
   item.append(actions);
 
-  const ariaLabel = label && label !== defaultLabel ? `${label} ${clock.textContent}` : clock.textContent;
+  const ariaLabel = name && name !== defaultLabel ? `${name} ${clock.textContent}` : `${defaultLabel} ${clock.textContent}`;
   item.setAttribute("aria-label", ariaLabel);
   return item;
 }
@@ -1107,9 +1910,20 @@ function updateActiveTimerItemElement(item, timer) {
     }
   }
 
-  const label = (timer.label || "").trim();
-  const defaultLabel = isStopwatchTimer(timer) ? "Stopwatch" : "Timer";
-  const ariaLabel = label && label !== defaultLabel ? `${label} ${formattedClock}` : formattedClock;
+  applyActiveTimerNameToItem(item, timer);
+
+  const timerId = timer?.id != null ? String(timer.id).trim() : "";
+  if (timerId) {
+    if (item.dataset.timerId !== timerId) {
+      item.dataset.timerId = timerId;
+    }
+  } else if (item.dataset.timerId) {
+    delete item.dataset.timerId;
+  }
+
+  const name = sanitizeTimerLabel(timer.label, getTimerDefaultLabel(timer));
+  const defaultLabel = getTimerDefaultLabel(timer);
+  const ariaLabel = name && name !== defaultLabel ? `${name} ${formattedClock}` : `${defaultLabel} ${formattedClock}`;
   if (item.getAttribute("aria-label") !== ariaLabel) {
     item.setAttribute("aria-label", ariaLabel);
   }
@@ -1271,7 +2085,7 @@ function applyActivityEvent(event) {
   }
 
   if (event.kind === "log" && isStopwatchStartedText(event.title)) {
-    startLocalStopwatch({ label: (event.detail || "").trim() || "Stopwatch" });
+    void syncRuntimeActiveTimers();
     return;
   }
 
@@ -1449,6 +2263,65 @@ function renderStorage(snapshot) {
   storageLog.scrollTop = 0;
 }
 
+const SYSTEM_METRICS_POLL_MS = 20_000;
+
+function formatCpuTemp(celsius) {
+  return `${Number(celsius).toFixed(1)} °C`;
+}
+
+function getCpuTempBand(celsius) {
+  if (celsius >= 80) {
+    return "hot";
+  }
+  if (celsius >= 60) {
+    return "warm";
+  }
+  return "ok";
+}
+
+function applySystemMetrics(system) {
+  if (!cpuTempChip) {
+    return;
+  }
+  const temp = system?.cpu_temperature_celsius;
+  if (temp == null) {
+    cpuTempChip.textContent = "";
+    cpuTempChip.classList.remove("cpu-temp-chip--warm", "cpu-temp-chip--hot", "cpu-temp-chip--throttled");
+    cpuTempChip.setAttribute("hidden", "");
+    return;
+  }
+  cpuTempChip.textContent = formatCpuTemp(temp);
+  cpuTempChip.classList.remove("cpu-temp-chip--warm", "cpu-temp-chip--hot", "cpu-temp-chip--throttled");
+  const band = getCpuTempBand(Number(temp));
+  if (band === "warm") {
+    cpuTempChip.classList.add("cpu-temp-chip--warm");
+  } else if (band === "hot") {
+    cpuTempChip.classList.add("cpu-temp-chip--hot");
+  }
+  if (system?.throttled === true) {
+    cpuTempChip.classList.add("cpu-temp-chip--throttled");
+  }
+  cpuTempChip.removeAttribute("hidden");
+}
+
+async function syncSystemMetrics() {
+  try {
+    const response = await nanoFetch("/api/system/metrics");
+    if (!response.ok) {
+      return;
+    }
+    applySystemMetrics(await response.json());
+  } catch (_error) {
+    return;
+  }
+}
+
+function startSystemMetricsPolling() {
+  window.setInterval(() => {
+    void syncSystemMetrics();
+  }, SYSTEM_METRICS_POLL_MS);
+}
+
 async function loadSnapshot() {
   const response = await nanoFetch("/api/status");
   if (!response.ok) {
@@ -1492,6 +2365,10 @@ async function bootstrap() {
         }, 0)
       : 0;
     listen(lastEventId);
+    bindActiveTimerActions();
+    bindActiveStopwatchActions();
+    bindActiveTimerNameEdit();
+    startSystemMetricsPolling();
     if (typeof loadNanoVersionFromBackend === "function") {
       await loadNanoVersionFromBackend();
     }

@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 STATIC_DIR = ROOT_DIR / "static"
@@ -47,10 +48,32 @@ def test_homepage_shows_standby_ui() -> None:
     active_timers_index = response_text.index('id="active-timers"')
     active_stopwatches_index = response_text.index('id="active-stopwatches"')
     assert answer_index < user_speech_index < active_timers_index < active_stopwatches_index < essence_index
-    assert 'id="voice-push-toggle"' in response_text
+    assert 'id="commands-toggle"' in response_text
+    assert 'class="footer-cluster"' not in response_text
     assert 'id="input-actions"' in response_text
     assert 'class="input-action-btn"' not in response_text
     assert 'class="nano-version"' in response_text
+    assert 'id="cpu-temp-chip"' in response_text
+    assert 'id="cpu-temp-chip" class="cpu-temp-chip" hidden' in response_text
+
+
+def test_cpu_temperature_footer_integration() -> None:
+    html_text = _load_index_html()
+    activity_js = (STATIC_DIR / "home-activity.js").read_text(encoding="utf-8")
+    state_js = (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
+    css_text = _load_home_css()
+
+    assert 'id="cpu-temp-chip"' in html_text
+    assert "cpuTempChip" in state_js
+    assert "applySystemMetrics" in activity_js
+    assert "cpu_temperature_celsius" in activity_js
+    assert "SYSTEM_METRICS_POLL_MS" in activity_js
+    assert "syncSystemMetrics" in activity_js
+    assert "startSystemMetricsPolling" in activity_js
+    assert 'nanoFetch("/api/system/metrics")' in activity_js
+    assert ".cpu-temp-chip" in css_text
+    assert ".cpu-temp-chip--warm" in css_text
+    assert ".cpu-temp-chip--hot" in css_text
 
 
 def test_favicon_asset_exists() -> None:
@@ -76,7 +99,7 @@ def test_homepage_uses_remote_api_client() -> None:
     assert "nanoEventSource" in js_text
     assert "ensureApiConnection" in js_text
     assert "sendVoiceCommand" in js_text
-    assert "voice-push-toggle" in html_text
+    assert 'id="commands-toggle"' in html_text
     assert ".user-speech" in css_text
 
 
@@ -155,6 +178,7 @@ def test_reboot_restart_reconnect_helpers() -> None:
     reconnect_js = (STATIC_DIR / "home-reconnect.js").read_text(encoding="utf-8")
     api_js = (STATIC_DIR / "nano-api.js").read_text(encoding="utf-8")
     voice_js = (STATIC_DIR / "home-voice.js").read_text(encoding="utf-8")
+    chat_js = (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
     entry_js = (STATIC_DIR / "home-entry.js").read_text(encoding="utf-8")
 
     assert "waitForNano" in api_js
@@ -169,6 +193,14 @@ def test_reboot_restart_reconnect_helpers() -> None:
     assert "pendingSystemCommandId" in js_text
     assert "reboot_confirmation" not in voice_js
     assert "restart_confirmation" not in voice_js
+    assert "pickSystemCommandConfirmation" in reconnect_js
+    assert "resolveSystemCommandConfirmation" in reconnect_js
+    restart_pool = reconnect_js.split("const DEFAULT_RESTART_CONFIRMATION_POOL = [", 1)[1].split("];", 1)[0]
+    reboot_pool = reconnect_js.split("const DEFAULT_REBOOT_CONFIRMATION_POOL = [", 1)[1].split("];", 1)[0]
+    assert restart_pool.count('"') // 2 >= 10
+    assert reboot_pool.count('"') // 2 >= 10
+    assert "resolveSystemCommandConfirmation(" in chat_js
+    assert "resolveSystemCommandConfirmation(" in voice_js
 
 
 def test_improvement_plans_removed() -> None:
@@ -225,10 +257,35 @@ def test_timer_tool_command_helpers() -> None:
     assert "resolveToolCommandMessage" in ui_js
     assert "isTimerToolCommand" in ui_js
     assert 'return "Start a timer"' in ui_js
+    assert 'id === "clear_all_timers"' in ui_js
+    assert 'id === "cancel_timers"' in ui_js
+    assert 'id === "stop_stopwatches"' in ui_js
     assert 'source !== "command"' in chat_js
     assert "formatTimerDurationAnswer" in chat_js
     assert "answerNeedsTimerDuration" in voice_js
     assert "restoreWake: false" in ui_js
+
+
+def test_clear_all_timers() -> None:
+    activity_js = (STATIC_DIR / "home-activity.js").read_text(encoding="utf-8")
+    chat_js = (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
+    ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+
+    assert "isClearAllTimersMessage" in activity_js
+    assert "isClearAllTimersCommand" in activity_js
+    assert "clearAllLocalTimerState" in activity_js
+    assert "clearAllLocalTimerState()" in chat_js
+    assert "isClearAllTimersCommand(commandHint)" in chat_js
+    assert "isClearAllTimersMessage(message)" in chat_js
+    assert "followUpClearAllTimersOnServer" in chat_js
+    assert "getStopwatchStoppedKeys" in activity_js
+    assert "buildStopStopwatchMessage" in activity_js
+    assert "serverStopwatches.length === 0" in activity_js
+    active_timers_pattern = re.compile(r"\bactive\s+timers?\b", re.IGNORECASE)
+    assert not active_timers_pattern.search("Clear all timers.")
+    assert "SUPPLEMENTAL_TOOL_COMMANDS" in ui_js
+    assert "supplementToolCommands" in ui_js
+    assert '"clear_all_timers"' in ui_js
 
 
 def test_active_timer_ui() -> None:
@@ -247,6 +304,18 @@ def test_active_timer_ui() -> None:
     assert "has-active-timers" in activity_js
     assert "position: absolute" not in css_text.split(".active-timers {", 1)[1].split("}", 1)[0]
     assert "cancelActiveTimer" in chat_js
+    assert "persistTimerCancel" in chat_js
+    assert "deleteTimerById" in activity_js
+    assert "waitForServerTimerRemoved" in activity_js
+    assert "TIMER_SERVER_SYNC_MAX_ATTEMPTS" in (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
+    assert "TIMER_SERVER_SYNC_POLL_MS" in activity_js
+    cancel_fn = chat_js.split("async function persistTimerCancel", 1)[1].split("async function cancelActiveTimer", 1)[0]
+    assert "await deleteTimerById(id)" in cancel_fn
+    assert cancel_fn.index("await deleteTimerById(id)") < cancel_fn.index("await persistViaSilentChat()")
+    assert "restoreCountdownTimerState" in activity_js
+    assert 'method: "DELETE"' in activity_js
+    assert "postTimerAgentCommandSilently" in chat_js
+    assert "submitMessage(buildCancelTimerMessage" not in chat_js
     assert "announceTimerExpired" in activity_js
     assert "rescheduleTimerExpiries" in activity_js
     assert "getActiveTimerRemainingMs" in activity_js
@@ -266,10 +335,41 @@ def test_active_timer_ui() -> None:
     assert "startLocalStopwatch" in activity_js
     assert "localStopwatches" in (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
     assert "stoppedStopwatchKeys" in (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
+    assert "stoppedStopwatchIds" in (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
     assert "stopLocalStopwatch" in activity_js
+    assert "stopActiveStopwatch" in chat_js
+    assert "persistStopwatchStop" in chat_js
+    assert "deleteStopwatchById" in activity_js
+    assert "waitForServerStopwatchRemoved" in activity_js
+    assert "restoreStopwatchState" in activity_js
+    assert "currentServerStopwatches" in (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
+    assert "submitMessage(buildStopStopwatchMessage" not in chat_js
+    assert "buildStopStopwatchMessage(id)" in chat_js
+    stop_fn = chat_js.split("async function persistStopwatchStop", 1)[1].split("async function cancelActiveTimer", 1)[0]
+    assert "await deleteStopwatchById(id)" in stop_fn
+    assert stop_fn.index("await deleteStopwatchById(id)") < stop_fn.index("await persistViaSilentChat()")
+    assert "isStopwatchNotFoundError" in activity_js
+    assert "isStopwatchNotFoundError(error)" in stop_fn
+    assert stop_fn.index("isStopwatchNotFoundError(error)") < stop_fn.index("await persistViaSilentChat()")
+    assert "restoreStopwatchState(previousStopwatch, timerKey)" in stop_fn
+    assert stop_fn.index("isStopwatchNotFoundError(error)") < stop_fn.index(
+        "restoreStopwatchState(previousStopwatch, timerKey)"
+    )
+    assert "createStopwatchApiError" in activity_js
+    assert "error.status = status" in activity_js
+    assert "response.status === 404" in activity_js
+    assert "isStopwatchStopMessage(message)" not in chat_js
+    assert "bindActiveStopwatchActions" in activity_js
+    assert "bindActiveTimerActions" in activity_js
+    assert "findCountdownTimerForAction" in activity_js
+    assert "isServerBackedStopwatch" in activity_js
+    assert "serverBacked" in activity_js
     assert "isStopwatchStartMessage" in activity_js
+    assert "clearAllLocalTimerState" in activity_js
+    assert "isClearAllTimersMessage" in activity_js
     assert "extractCountdownTimers" in activity_js
-    assert "isStopwatchStartedText" in chat_js
+    assert "isStopwatchStartedText" in activity_js
+    assert "pruneOptimisticStopwatchesForServerTimer" in activity_js
     assert "startTimerReminders" in activity_js
     assert "active-timer-item--overdue" in activity_js
     assert "TIMER_REMINDER_INTERVAL_MS" in (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
@@ -279,6 +379,54 @@ def test_active_timer_ui() -> None:
     assert "active-timer-item--overdue" in css_text
     assert "@media (min-width: 600px)" in css_text
     assert "grid-template-columns: repeat(2, minmax(0, 1fr))" in css_text
+
+
+def test_timer_rename_ui() -> None:
+    activity_js = (STATIC_DIR / "home-activity.js").read_text(encoding="utf-8")
+    chat_js = (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
+    css_text = _load_home_css()
+
+    assert "sanitizeTimerLabel" in activity_js
+    assert "buildRenameTimerMessage" in activity_js
+    assert "buildRenameStopwatchMessage" in activity_js
+    assert "buildCancelTimerMessage" in activity_js
+    assert 'method: "PATCH"' in activity_js
+    assert "/api/timers/" in activity_js
+    assert "/api/stopwatches/" in activity_js
+    assert "patchTimerLabel" in activity_js
+    assert "patchStopwatchLabel" in activity_js
+    assert "updateCountdownTimerLabel" in activity_js
+    assert "updateLocalStopwatchLabel" in activity_js
+    assert "bindActiveTimerNameEdit" in activity_js
+    assert "active-timer-name-input" in activity_js
+    assert "createActiveTimerNameElement" in activity_js
+    assert "renameActiveTimer" in chat_js
+    assert "renameActiveStopwatch" in chat_js
+    assert "persistTimerRename" in chat_js
+    assert "postTimerRenameSilently" in chat_js
+    assert "waitForServerTimerLabel" in chat_js
+    assert "data.content" in chat_js
+    assert "isCrossOriginApi()" not in chat_js
+    assert "isCrossOriginApi" in (STATIC_DIR / "nano-api.js").read_text(encoding="utf-8")
+    assert "postTimerCommand" not in chat_js
+    assert "submitMessage(buildRenameTimerMessage" not in chat_js
+    assert "submitMessage(buildRenameStopwatchMessage" not in chat_js
+    assert "buildCancelTimerMessage(timer)" not in chat_js
+    assert "buildCancelTimerMessage(id)" in chat_js
+    assert ".active-timer-name--default" in css_text
+    assert ".active-timer-name-input" in css_text
+
+
+def test_nano_api_dev_proxy() -> None:
+    api_js = (STATIC_DIR / "nano-api.js").read_text(encoding="utf-8")
+    dev_server = (Path(__file__).resolve().parents[1] / "scripts" / "dev-server.mjs").read_text(
+        encoding="utf-8"
+    )
+
+    assert "NANO_DEV_API_PROXY" in api_js
+    assert "shouldUseDevApiProxy" in api_js
+    assert "resolveApiBase" in api_js
+    assert "NANO_DEV_API_PROXY" in dev_server
 
 
 def test_git_pr_ui_removed() -> None:

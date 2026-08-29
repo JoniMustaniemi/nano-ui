@@ -100,7 +100,47 @@ async function submitConfirmationAnswer(answer) {
   await submitInputAnswer(answer);
 }
 
-async function submitMessage(message, source, commandHint) {
+function findToolCommandById(commandId) {
+  const targetId = String(commandId || "").trim().toLowerCase();
+  if (!targetId || !Array.isArray(toolCommands)) {
+    return null;
+  }
+  return (
+    toolCommands.find((command) => String(command?.id || "").trim().toLowerCase() === targetId) ||
+    null
+  );
+}
+
+async function followUpClearAllTimersOnServer() {
+  let snapshot;
+  try {
+    snapshot = await loadSnapshot();
+  } catch (_error) {
+    return;
+  }
+  const remainingStopwatches = extractStopwatchSeedTimers(snapshot);
+  const remainingCountdown = extractCountdownTimersFromSnapshot(snapshot);
+  if (remainingStopwatches.length > 0) {
+    const stopCommand = findToolCommandById("stop_stopwatches");
+    const stopMessage = stopCommand ? resolveToolCommandMessage(stopCommand) : "";
+    if (stopMessage) {
+      await submitMessage(stopMessage, "command", stopCommand, { skipClearAllFollowUp: true });
+    }
+  }
+  if (remainingCountdown.length > 0) {
+    const cancelCommand = findToolCommandById("cancel_timers");
+    const cancelMessage = cancelCommand ? resolveToolCommandMessage(cancelCommand) : "";
+    if (cancelMessage) {
+      await submitMessage(cancelMessage, "command", cancelCommand, { skipClearAllFollowUp: true });
+    }
+  }
+}
+
+async function submitMessage(message, source, commandHint, options = {}) {
+  const skipClearAllFollowUp = Boolean(options.skipClearAllFollowUp);
+  const clearAllRequested =
+    !skipClearAllFollowUp &&
+    (isClearAllTimersCommand(commandHint) || isClearAllTimersMessage(message));
   const confirmationAnswer = Boolean(commandHint?.confirmationAnswer);
   const inputAnswer = Boolean(commandHint?.inputAnswer);
   const typedConfirmationAnswer =
@@ -138,12 +178,8 @@ async function submitMessage(message, source, commandHint) {
   if (isSystemCommandId(commandHint?.id)) {
     setPendingSystemCommand(commandHint.id);
   }
-  if (isStopwatchStartMessage(message)) {
-    startLocalStopwatch({ label: parseStopwatchLabel(message) });
-  } else if (isStopwatchStopMessage(message)) {
-    showUserSpeech(message);
-    stopAllLocalStopwatches();
-    return;
+  if (isClearAllTimersCommand(commandHint) || isClearAllTimersMessage(message)) {
+    clearAllLocalTimerState();
   }
   showUserSpeech(message);
   requestInFlight = true;
@@ -169,7 +205,7 @@ async function submitMessage(message, source, commandHint) {
     if (!response.ok) {
       throw new Error(data.detail || "Chat request failed.");
     }
-    answerText = data.content;
+    answerText = resolveSystemCommandConfirmation(data.content, message);
     shouldSpeak = data.speak !== false;
     setAnswer(answerText, { deferClearUntilSpeech: shouldSpeak, allowDuringWorking: true });
     replyStatus.textContent = "";
@@ -185,6 +221,9 @@ async function submitMessage(message, source, commandHint) {
     requestInFlight = false;
     if (!reconnectInProgress) {
       await syncRuntimeStatus();
+      if (clearAllRequested) {
+        await followUpClearAllTimersOnServer();
+      }
       if (isConfirmationAnswer) {
         returnToWakeDetection();
       }
@@ -193,10 +232,6 @@ async function submitMessage(message, source, commandHint) {
 
   if (requestFailed || !answerText) {
     return;
-  }
-
-  if (isStopwatchStartedText(answerText)) {
-    startLocalStopwatch();
   }
 
   const systemResponse = handleSystemCommandResponse(answerText);
@@ -268,19 +303,271 @@ async function submitMessage(message, source, commandHint) {
   returnToWakeDetection();
 }
 
-async function cancelActiveTimer(timer) {
-  if (isStopwatchTimer(timer)) {
+async function stopActiveStopwatch(timer) {
+  if (!timer) {
+    return;
+  }
+
+  if (!isServerBackedStopwatch(timer)) {
     stopLocalStopwatch(timer);
     return;
   }
-  clearCountdownTimerState(timer, { suppress: true });
+
+  const id = timer?.id != null ? String(timer.id).trim() : "";
+  if (!id) {
+    replyStatus.textContent = "This stopwatch cannot be stopped yet.";
+    return;
+  }
+
+  const timerKey = getTimerAnnouncementKey(timer);
+  const previousStopwatch = { ...timer };
+
+  clearStopwatchState(timer);
   refreshTimerDisplays();
+
   if (isBusy() || requestInFlight || reconnectInProgress) {
+    restoreStopwatchState(previousStopwatch, timerKey);
     replyStatus.textContent = "Wait for the current task to finish.";
     return;
   }
-  const label = (timer?.label || "").trim();
-  const message = label ? `Cancel the timer "${label}"` : "Cancel the timer";
-  await submitMessage(message, "command");
+
+  await persistStopwatchStop({ id, previousStopwatch, timerKey });
+}
+
+async function postTimerAgentCommandSilently(message) {
+  const response = await nanoFetch("/api/chat", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      message,
+      mode: "agent",
+    }),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.detail || "Timer command failed.");
+  }
+  const errorText = String(data.content || "").trim();
+  if (errorText) {
+    throw new Error(errorText);
+  }
+  return data;
+}
+
+async function postTimerRenameSilently(message) {
+  return postTimerAgentCommandSilently(message);
+}
+
+async function waitForServerTimerLabel(timerKey, expectedLabel, defaultLabel) {
+  const expected = sanitizeTimerLabel(expectedLabel, defaultLabel);
+  for (let attempt = 0; attempt < TIMER_SERVER_SYNC_MAX_ATTEMPTS; attempt += 1) {
+    if (attempt > 0) {
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, TIMER_SERVER_SYNC_POLL_MS);
+      });
+    }
+    await syncRuntimeStatus();
+    const timer = findActiveTimerByKey(timerKey);
+    if (timer && sanitizeTimerLabel(timer.label, defaultLabel) === expected) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function persistTimerRename({
+  timerKey,
+  id,
+  sanitized,
+  defaultLabel,
+  previousLabel,
+  updateLabel,
+  patchFn,
+  buildMessage,
+}) {
+  const persistViaSilentChat = async () => {
+    await postTimerRenameSilently(buildMessage(id, sanitized));
+    const persisted = await waitForServerTimerLabel(timerKey, sanitized, defaultLabel);
+    if (!persisted) {
+      throw new Error("Timer rename did not save.");
+    }
+  };
+
+  try {
+    const updated = await patchFn(id, sanitized);
+    updateLabel(timerKey, sanitizeTimerLabel(updated.label, defaultLabel));
+    return;
+  } catch (_error) {
+    // Fall through to silent chat when PATCH is unavailable.
+  }
+
+  try {
+    await persistViaSilentChat();
+  } catch (error) {
+    updateLabel(timerKey, previousLabel);
+    replyStatus.textContent = error.message || "Could not save timer name.";
+  }
+}
+
+async function renameActiveStopwatch(timer, newLabel) {
+  if (!timer) {
+    return;
+  }
+  const defaultLabel = "Stopwatch";
+  const sanitized = sanitizeTimerLabel(newLabel, defaultLabel);
+  const currentLabel = sanitizeTimerLabel(timer.label, defaultLabel);
+  if (sanitized === currentLabel) {
+    return;
+  }
+
+  const timerKey = getTimerAnnouncementKey(timer);
+  const previousLabel = timer.label;
+  updateLocalStopwatchLabel(timerKey, sanitized);
+
+  if (!isServerBackedStopwatch(timer)) {
+    return;
+  }
+
+  const id = String(timer.id || "").trim();
+  if (!id) {
+    return;
+  }
+
+  await persistTimerRename({
+    timerKey,
+    id,
+    sanitized,
+    defaultLabel,
+    previousLabel,
+    updateLabel: updateLocalStopwatchLabel,
+    patchFn: patchStopwatchLabel,
+    buildMessage: buildRenameStopwatchMessage,
+  });
+}
+
+async function renameActiveTimer(timer, newLabel) {
+  if (!timer) {
+    return;
+  }
+  if (isStopwatchTimer(timer)) {
+    await renameActiveStopwatch(timer, newLabel);
+    return;
+  }
+
+  const defaultLabel = "Timer";
+  const sanitized = sanitizeTimerLabel(newLabel, defaultLabel);
+  const currentLabel = sanitizeTimerLabel(timer.label, defaultLabel);
+  if (sanitized === currentLabel) {
+    return;
+  }
+
+  const timerKey = getTimerAnnouncementKey(timer);
+  const previousLabel = timer.label;
+  updateCountdownTimerLabel(timerKey, sanitized);
+
+  const id = String(timer.id || "").trim();
+  if (!id) {
+    return;
+  }
+
+  await persistTimerRename({
+    timerKey,
+    id,
+    sanitized,
+    defaultLabel,
+    previousLabel,
+    updateLabel: updateCountdownTimerLabel,
+    patchFn: patchTimerLabel,
+    buildMessage: buildRenameTimerMessage,
+  });
+}
+
+async function persistTimerCancel({ id, previousTimer, timerKey }) {
+  const persistViaSilentChat = async () => {
+    await postTimerAgentCommandSilently(buildCancelTimerMessage(id));
+    const removed = await waitForServerTimerRemoved(id);
+    if (!removed) {
+      throw new Error("Timer cancel did not complete.");
+    }
+  };
+
+  try {
+    await deleteTimerById(id);
+    const removed = await waitForServerTimerRemoved(id);
+    if (!removed) {
+      throw new Error("Timer cancel did not complete.");
+    }
+    return;
+  } catch (_error) {
+    // Fall through to silent chat when DELETE is unavailable.
+  }
+
+  try {
+    await persistViaSilentChat();
+  } catch (error) {
+    restoreCountdownTimerState(previousTimer, timerKey);
+    replyStatus.textContent = error.message || "Could not cancel timer.";
+  }
+}
+
+async function persistStopwatchStop({ id, previousStopwatch, timerKey }) {
+  const persistViaSilentChat = async () => {
+    await postTimerAgentCommandSilently(buildStopStopwatchMessage(id));
+    const removed = await waitForServerStopwatchRemoved(id);
+    if (!removed) {
+      throw new Error("Stopwatch stop did not complete.");
+    }
+  };
+
+  try {
+    await deleteStopwatchById(id);
+    const removed = await waitForServerStopwatchRemoved(id);
+    if (!removed) {
+      throw new Error("Stopwatch stop did not complete.");
+    }
+    return;
+  } catch (error) {
+    if (isStopwatchNotFoundError(error)) {
+      restoreStopwatchState(previousStopwatch, timerKey);
+      replyStatus.textContent = error.message || "Stopwatch not found.";
+      return;
+    }
+    // Fall through to silent chat when DELETE is unavailable.
+  }
+
+  try {
+    await persistViaSilentChat();
+  } catch (error) {
+    restoreStopwatchState(previousStopwatch, timerKey);
+    replyStatus.textContent = error.message || "Could not stop stopwatch.";
+  }
+}
+
+async function cancelActiveTimer(timer) {
+  if (isStopwatchTimer(timer)) {
+    await stopActiveStopwatch(timer);
+    return;
+  }
+  const id = timer?.id != null ? String(timer.id).trim() : "";
+  if (!id) {
+    replyStatus.textContent = "This timer cannot be cancelled yet.";
+    return;
+  }
+
+  const timerKey = getTimerAnnouncementKey(timer);
+  const previousTimer = { ...timer };
+
+  clearCountdownTimerState(timer, { suppress: true });
+  refreshTimerDisplays();
+
+  if (isBusy() || requestInFlight || reconnectInProgress) {
+    restoreCountdownTimerState(previousTimer, timerKey);
+    replyStatus.textContent = "Wait for the current task to finish.";
+    return;
+  }
+
+  await persistTimerCancel({ id, previousTimer, timerKey });
 }
 

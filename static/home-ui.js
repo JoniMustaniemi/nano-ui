@@ -27,6 +27,15 @@ const EXCLUDED_COMMAND_CATEGORIES = new Set(["git", "github"]);
 const GIT_PR_COMMAND_PATTERN =
   /\b(commit|pull request|pull_request|create pr|gh pr|git push|git commit)\b/i;
 const ACTIVE_TIMERS_COMMAND_PATTERN = /\bactive\s+timers?\b/i;
+const SUPPLEMENTAL_TOOL_COMMANDS = [
+  {
+    id: "clear_all_timers",
+    category: "Timers",
+    label: "Clear all timers",
+    description: "Clear every countdown timer and stopwatch.",
+    message: "Clear all timers.",
+  },
+];
 const YES_NO_PENDING_KINDS = new Set(["wipe_confirmation", "presence_check"]);
 const YES_NO_INPUT_ACTIONS = [
   { label: "Yes", value: "yes", variant: "yes" },
@@ -292,20 +301,17 @@ function shouldSuppressControlsChrome() {
   return controlsHidden || getDisplayState() === "working";
 }
 
-function shouldShowControlsRevealZones() {
-  return controlsHidden && getDisplayState() !== "working";
-}
-
 function updateInputLock() {
   const locked = getDisplayState() === "working" || reconnectInProgress;
   messageBox.disabled = locked;
   sendButton.disabled = locked;
   commandsToggle.disabled = locked;
-  if (commandsToggleReveal) {
-    commandsToggleReveal.disabled = locked;
+  if (nanoControlsToggle) {
+    nanoControlsToggle.disabled = locked;
   }
-  nanoControlsToggle.disabled = locked;
-  keyboardToggle.disabled = locked;
+  if (keyboardToggle) {
+    keyboardToggle.disabled = locked;
+  }
   setCommandButtonsDisabled(locked);
   syncInputActions();
   document.body.classList.toggle("inputs-locked", locked);
@@ -349,17 +355,35 @@ function filterToolCommands(commands) {
   return commands.filter((command) => !isExcludedToolCommand(command));
 }
 
+function supplementToolCommands(commands) {
+  const normalized = Array.isArray(commands) ? [...commands] : [];
+  const ids = new Set(
+    normalized.map((command) => String(command?.id || "").trim().toLowerCase()).filter(Boolean),
+  );
+  for (const command of SUPPLEMENTAL_TOOL_COMMANDS) {
+    const id = String(command.id || "").trim().toLowerCase();
+    if (id && !ids.has(id)) {
+      normalized.push(command);
+      ids.add(id);
+    }
+  }
+  return normalized;
+}
+
 async function loadToolCommands() {
   const response = await nanoFetch("/api/tool-commands");
   if (!response.ok) {
     throw new Error("Could not load tool commands.");
   }
   const commands = await response.json();
-  return filterToolCommands(commands);
+  return filterToolCommands(supplementToolCommands(commands));
 }
 
 function isTimerToolCommand(command) {
   const id = String(command?.id || "").toLowerCase();
+  if (id === "clear_all_timers" || id === "cancel_timers" || id === "stop_stopwatches") {
+    return false;
+  }
   const action = String(command?.client_action || "").toLowerCase();
   const message = String(command?.message || "").toLowerCase();
   const label = String(command?.label || "").toLowerCase();
@@ -671,12 +695,6 @@ async function completeUiCommand(source) {
 
 function applyControlsVisibility() {
   document.body.classList.toggle("controls-hidden", shouldSuppressControlsChrome());
-  if (controlsRevealZone) {
-    controlsRevealZone.hidden = !shouldShowControlsRevealZones();
-  }
-  if (commandsRevealZone) {
-    commandsRevealZone.hidden = !shouldShowControlsRevealZones();
-  }
   if (getDisplayState() === "working") {
     closeKeyboardPanel();
     closeViewSession({ reason: "working", restoreWake: false });
@@ -1135,7 +1153,9 @@ function openKeyboardPanel() {
   keyboardOpen = true;
   keyboardPanel.hidden = false;
   document.body.classList.add("keyboard-open");
-  keyboardToggle.querySelector("span").textContent = "Use Voice";
+  if (keyboardToggle) {
+    keyboardToggle.querySelector("span").textContent = "Use Voice";
+  }
   messageBox.focus();
 }
 
@@ -1143,7 +1163,9 @@ function closeKeyboardPanel() {
   keyboardOpen = false;
   document.body.classList.remove("keyboard-open");
   keyboardPanel.hidden = true;
-  keyboardToggle.querySelector("span").textContent = "Use Keyboard";
+  if (keyboardToggle) {
+    keyboardToggle.querySelector("span").textContent = "Use Keyboard";
+  }
 }
 
 function toggleKeyboardPanel() {

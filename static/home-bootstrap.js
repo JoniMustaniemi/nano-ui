@@ -27,34 +27,6 @@ commandsToggle.addEventListener("click", () => {
   }
   void openViewSession("commands", { source: "ui" });
 });
-if (commandsToggleReveal) {
-  commandsToggleReveal.addEventListener("click", () => {
-    if (getDisplayState() === "working") {
-      return;
-    }
-    if (isViewSessionActive() && activeView === "commands") {
-      closeViewSession({ reason: "ui" });
-      return;
-    }
-    void openViewSession("commands", { source: "ui" });
-  });
-}
-keyboardToggle.addEventListener("click", () => {
-  if (isBusy()) {
-    return;
-  }
-  toggleKeyboardPanel();
-});
-nanoControlsToggle.addEventListener("click", () => {
-  if (getDisplayState() === "working") {
-    return;
-  }
-  if (isViewSessionActive() && activeView === "brains") {
-    closeViewSession({ reason: "ui" });
-    return;
-  }
-  void openViewSession("brains", { source: "ui" });
-});
 if (viewModalClose) {
   viewModalClose.addEventListener("click", () => closeViewSession({ reason: "ui" }));
 }
@@ -78,14 +50,6 @@ messageBox.addEventListener("keydown", (event) => {
   }
 });
 brainsClearButton.addEventListener("click", clearActivityLog);
-if (controlsRevealButton) {
-  controlsRevealButton.addEventListener("click", () => {
-    if (getDisplayState() === "working") {
-      return;
-    }
-    setControlsHidden(false);
-  });
-}
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && controlsHidden && getDisplayState() !== "working") {
     setControlsHidden(false);

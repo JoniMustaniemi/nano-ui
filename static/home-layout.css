@@ -16,7 +16,7 @@
   --shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
   --content-max: 640px;
   --bottom-bar-h: 64px;
-  --footer-cluster-h: 120px;
+  --footer-cluster-h: 0px;
   --bottom-bar-offset: max(16px, env(safe-area-inset-bottom, 0));
   --page-pad-x: clamp(16px, 4vw, 28px);
   --page-pad-top: clamp(12px, 2.5vh, 24px);
@@ -44,6 +44,31 @@ body.keyboard-open {
   overflow: hidden;
 }
 
+.cpu-temp-chip {
+  position: fixed;
+  left: max(14px, calc(env(safe-area-inset-left, 0) + 10px));
+  bottom: max(14px, calc(env(safe-area-inset-bottom, 0) + 10px));
+  z-index: 35;
+  margin: 0;
+  color: rgba(107, 143, 114, 0.55);
+  font: 500 0.68rem/1 "Cascadia Mono", Consolas, monospace;
+  letter-spacing: 0.05em;
+  pointer-events: none;
+  user-select: none;
+}
+
+.cpu-temp-chip--warm {
+  color: rgba(212, 168, 67, 0.75);
+}
+
+.cpu-temp-chip--hot {
+  color: rgba(220, 90, 70, 0.85);
+}
+
+.cpu-temp-chip--throttled::after {
+  content: " ⚠";
+}
+
 .nano-version {
   position: fixed;
   left: 50%;
@@ -64,6 +89,12 @@ body.view-modal-open .essence-zone {
   transition: opacity 200ms ease, filter 200ms ease;
 }
 
+body.view-modal-open .active-timers,
+body.view-modal-open .active-stopwatches {
+  z-index: 10;
+  pointer-events: none;
+}
+
 body.controls-hidden .shell {
   padding-bottom: calc(var(--page-pad-top) + env(safe-area-inset-bottom, 0));
   justify-content: center;
@@ -81,115 +112,26 @@ body.controls-hidden .essence-zone {
 body.controls-hidden .footer-cluster,
 body.controls-hidden .keyboard-panel,
 body.view-calendar-active .footer-cluster,
-body.view-calendar-active .keyboard-panel,
-body.view-calendar-active .commands-reveal-zone,
-body.view-calendar-active .controls-reveal-zone {
+body.view-calendar-active .keyboard-panel {
   display: none !important;
 }
 
 body[data-display-state="working"] .footer-cluster,
-body[data-display-state="working"] .keyboard-panel,
-body[data-display-state="working"] .controls-reveal-zone,
-body[data-display-state="working"] .commands-reveal-zone {
+body[data-display-state="working"] .keyboard-panel {
   display: none !important;
 }
 
-.controls-reveal-zone {
+.commands-toggle-top {
   position: fixed;
-  left: 0;
-  bottom: 0;
-  z-index: 20;
-  width: min(42vw, 200px);
-  height: min(34vh, 150px);
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-start;
-  padding:
-    max(16px, env(safe-area-inset-bottom, 0))
-    max(16px, env(safe-area-inset-left, 0));
-  pointer-events: auto;
-}
-
-.controls-reveal-zone[hidden] {
-  display: none;
-}
-
-.controls-reveal {
-  position: relative;
-  left: auto;
-  bottom: auto;
-  transform: none;
-  z-index: 1;
+  top: max(14px, calc(env(safe-area-inset-top, 0) + 10px));
+  right: max(14px, calc(env(safe-area-inset-right, 0) + 10px));
+  z-index: 40;
   margin: 0;
-  padding: 10px 16px;
-  border: none;
-  border-radius: 20px;
+  border: 1px solid rgba(57, 255, 20, 0.12);
+  border-radius: 14px;
   background: rgba(0, 0, 0, 0.52);
-  color: var(--accent-soft);
-  font: 600 0.82rem/1 "Segoe UI", system-ui, sans-serif;
-  cursor: pointer;
   backdrop-filter: blur(16px);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.38);
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    opacity 160ms ease,
-    color 140ms ease,
-    border-color 140ms ease,
-    background 140ms ease;
-}
-
-.controls-reveal-zone:hover .controls-reveal,
-.controls-reveal:focus-visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.controls-reveal:hover,
-.controls-reveal:focus-visible {
-  transform: none;
-  color: var(--accent-strong);
-  background: rgba(0, 0, 0, 0.62);
-}
-
-.commands-reveal-zone {
-  position: fixed;
-  right: 0;
-  bottom: 0;
-  z-index: 20;
-  width: min(42vw, 200px);
-  height: min(34vh, 150px);
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-end;
-  padding:
-    max(16px, env(safe-area-inset-bottom, 0))
-    max(16px, env(safe-area-inset-right, 0));
-  pointer-events: auto;
-}
-
-.commands-reveal-zone[hidden] {
-  display: none;
-}
-
-.commands-reveal {
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    opacity 160ms ease,
-    border-color 140ms ease,
-    background 140ms ease;
-}
-
-.commands-reveal-zone:hover .commands-reveal,
-.commands-reveal:focus-visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.commands-reveal:hover,
-.commands-reveal:focus-visible {
-  transform: none;
 }
 
 .shell {
@@ -202,7 +144,7 @@ body[data-display-state="working"] .commands-reveal-zone {
   padding:
     var(--page-pad-top)
     var(--page-pad-x)
-    calc(var(--footer-cluster-h) + var(--bottom-bar-offset) + 8px);
+    calc(max(14px, env(safe-area-inset-bottom, 0) + 28px));
   overflow: hidden;
 }
 
@@ -447,7 +389,7 @@ body.has-active-stopwatches .essence-zone {
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: rgba(57, 255, 20, 0.28) transparent;
-    z-index: 5;
+    z-index: 50;
     align-items: stretch;
   }
 
@@ -465,7 +407,7 @@ body.has-active-stopwatches .essence-zone {
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: rgba(57, 255, 20, 0.28) transparent;
-    z-index: 5;
+    z-index: 50;
     align-items: stretch;
   }
 
@@ -490,6 +432,10 @@ body.has-active-stopwatches .essence-zone {
     align-items: stretch;
     gap: clamp(6px, 1vh, 10px);
     width: 100%;
+  }
+
+  .active-stopwatches-grid {
+    gap: clamp(12px, 1.6vh, 16px);
   }
 
   .active-timers-grid .active-timer-item,
@@ -579,6 +525,15 @@ body.has-active-stopwatches .essence-zone {
   width: 100%;
 }
 
+.active-stopwatches-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: stretch;
+  gap: clamp(12px, 1.6vh, 18px);
+  width: 100%;
+}
+
 .active-timer-item {
   display: flex;
   flex-direction: column;
@@ -616,8 +571,7 @@ body.has-active-stopwatches .essence-zone {
   box-shadow: 0 0 28px rgba(255, 120, 72, 0.12);
 }
 
-.active-timer-item--overdue .active-timer-kind {
-  border-color: rgba(255, 120, 72, 0.34);
+.active-timer-item--overdue .active-timer-name {
   color: #ffb08a;
 }
 
@@ -646,30 +600,56 @@ body.has-active-stopwatches .essence-zone {
   gap: 0.3rem 0.45rem;
 }
 
-.active-timer-kind {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.18rem 0.4rem;
-  border-radius: 999px;
-  border: 1px solid rgba(57, 255, 20, 0.22);
-  color: var(--accent-strong);
-  font: 700 0.52rem/1 "Segoe UI", system-ui, sans-serif;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.active-timer-item--stopwatch .active-timer-kind {
-  border-color: rgba(18, 210, 160, 0.28);
-  color: #8ef0d2;
-}
-
-.active-timer-label {
+.active-timer-name {
   color: var(--text);
   font-family: "Segoe UI", system-ui, sans-serif;
   font-size: clamp(0.72rem, 1.6vw, 0.82rem);
   font-weight: 600;
   letter-spacing: 0.01em;
   line-height: 1.2;
+  cursor: pointer;
+}
+
+.active-timer-item--stopwatch .active-timer-name {
+  color: #8ef0d2;
+}
+
+.active-timer-name--default {
+  color: var(--muted);
+}
+
+.active-timer-name:hover,
+.active-timer-name:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+  outline: none;
+}
+
+.active-timer-name-input {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0.1rem 0.25rem;
+  border: 1px solid rgba(57, 255, 20, 0.35);
+  border-radius: 0.25rem;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: clamp(0.72rem, 1.6vw, 0.82rem);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+}
+
+.active-timer-name-input:focus {
+  outline: none;
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 0 2px rgba(57, 255, 20, 0.15);
+}
+
+.active-timer-item--editing .active-timer-action {
+  pointer-events: none;
+  opacity: 0.45;
 }
 
 .active-timer-clock {
@@ -1023,7 +1003,7 @@ body[data-display-state="working"] .activity-cursor {
 .keyboard-panel {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--footer-cluster-h) + var(--bottom-bar-offset) + 8px);
+  bottom: max(14px, calc(env(safe-area-inset-bottom, 0) + 10px));
   transform: translateX(-50%) translateY(110%);
   z-index: 25;
   width: min(var(--content-max), calc(100vw - 32px));

@@ -22,6 +22,105 @@ const RECONNECT_LABELS = {
   restart_nano: "Waiting for Nano to restart.",
 };
 
+const DEFAULT_RESTART_CONFIRMATION_POOL = [
+  "Quick check — want me to restart Nano? Yes to go ahead, no to cancel.",
+  "I can bounce and come back. Your call — yes or no?",
+  "Heads up: this restarts the service. Still want to?",
+  "Ready when you are. Restart Nano — yes or no?",
+  "Just to be sure — restart the service? Yes proceeds, no backs out.",
+  "Restart incoming, if you confirm. Yes or no?",
+  "Want a fresh start? Say yes to restart, no to keep going.",
+  "I can restart myself and be right back. Go for it? Yes or no.",
+  "Double-checking: restart now? Yes or no.",
+  "Say yes to restart Nano, or no to leave things as they are.",
+];
+
+const DEFAULT_REBOOT_CONFIRMATION_POOL = [
+  "That'll reboot the Pi. Still good? Yes or no.",
+  "Ready to reboot the Raspberry Pi? Yes to confirm, no to cancel.",
+  "Heads up — full Pi reboot ahead. Proceed? Yes or no.",
+  "Just checking: reboot the Pi now? Yes or no.",
+  "This reboots the whole Raspberry Pi. Your call — yes or no?",
+  "Pi reboot on deck. Confirm with yes, or no to skip.",
+  "Want me to reboot the Pi? Yes to go ahead, no to back out.",
+  "Full system reboot coming up. Still want to? Yes or no.",
+  "Double-checking before I reboot the Pi. Yes or no?",
+  "Say yes to reboot the Pi, or no to keep it running.",
+];
+
+const SYSTEM_COMMAND_CONFIRMATION_POOLS = {
+  reboot_pi: [...DEFAULT_REBOOT_CONFIRMATION_POOL],
+  restart_nano: [...DEFAULT_RESTART_CONFIRMATION_POOL],
+};
+
+let lastRestartConfirmation = "";
+let lastRebootConfirmation = "";
+
+function pickSystemCommandConfirmation(commandId) {
+  const pool = SYSTEM_COMMAND_CONFIRMATION_POOLS[commandId];
+  if (!pool || pool.length === 0) {
+    return "Reply yes to confirm or no to cancel.";
+  }
+  if (pool.length === 1) {
+    const pick = pool[0];
+    if (commandId === "reboot_pi") {
+      lastRebootConfirmation = pick;
+    } else {
+      lastRestartConfirmation = pick;
+    }
+    return pick;
+  }
+  const lastPick = commandId === "reboot_pi" ? lastRebootConfirmation : lastRestartConfirmation;
+  let pick = pool[0];
+  do {
+    pick = pool[Math.floor(Math.random() * pool.length)];
+  } while (pick === lastPick);
+  if (commandId === "reboot_pi") {
+    lastRebootConfirmation = pick;
+  } else {
+    lastRestartConfirmation = pick;
+  }
+  return pick;
+}
+
+function isSystemCommandTerminalResponse(answerText) {
+  return Boolean(
+    matchSystemCommandPhrase(answerText, RECONNECT_SUCCESS) ||
+      matchSystemCommandPhrase(answerText, RECONNECT_CANCEL) ||
+      matchSystemCommandPhrase(answerText, RECONNECT_DISABLED)
+  );
+}
+
+function isSystemCommandYesNoPrompt(answerText) {
+  const content = String(answerText || "");
+  const lowered = content.toLowerCase();
+  return (
+    answerNeedsYesNoConfirmation(content) ||
+    lowered.includes("reply yes to proceed or no to cancel")
+  );
+}
+
+function resolveSystemCommandConfirmation(answerText, userMessage) {
+  const content = String(answerText || "").trim();
+  if (!content || isSystemCommandTerminalResponse(content)) {
+    return content;
+  }
+  if (!isSystemCommandYesNoPrompt(content)) {
+    return content;
+  }
+
+  const commandId =
+    pendingSystemCommandId ||
+    inferSystemCommandFromMessage(userMessage) ||
+    inferSystemCommandFromMessage(content);
+  if (!isSystemCommandId(commandId)) {
+    return content;
+  }
+
+  setPendingSystemCommand(commandId);
+  return pickSystemCommandConfirmation(commandId);
+}
+
 function isSystemCommandId(commandId) {
   return SYSTEM_COMMAND_IDS.has(String(commandId || "").trim());
 }

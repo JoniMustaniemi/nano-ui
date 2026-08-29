@@ -15,7 +15,7 @@ function getDefaultApiKey() {
   return "";
 }
 
-function getApiBase() {
+function getConfiguredApiUrl() {
   try {
     const stored = window.localStorage.getItem(NANO_API_URL_KEY);
     if (stored && stored.trim()) {
@@ -25,6 +25,43 @@ function getApiBase() {
     return getDefaultApiUrl();
   }
   return getDefaultApiUrl();
+}
+
+function shouldUseDevApiProxy(configuredBase) {
+  if (window.NANO_DEV_API_PROXY !== true) {
+    return false;
+  }
+  if (!configuredBase) {
+    return true;
+  }
+  try {
+    return new URL(configuredBase).origin !== window.location.origin;
+  } catch (_error) {
+    return true;
+  }
+}
+
+function resolveApiBase(configuredBase) {
+  const normalized = (configuredBase || "").trim().replace(/\/$/, "");
+  if (shouldUseDevApiProxy(normalized)) {
+    return window.location.origin.replace(/\/$/, "");
+  }
+  if (normalized) {
+    return normalized;
+  }
+  return window.location.origin.replace(/\/$/, "");
+}
+
+function getApiBase() {
+  return resolveApiBase(getConfiguredApiUrl());
+}
+
+function isCrossOriginApi() {
+  try {
+    return new URL(getApiBase()).origin !== window.location.origin;
+  } catch (_error) {
+    return true;
+  }
 }
 
 function getApiKey() {
@@ -65,10 +102,20 @@ function withAuthHeaders(headers = {}) {
 }
 
 async function nanoFetch(path, options = {}) {
-  const response = await fetch(buildApiUrl(path), {
-    ...options,
-    headers: withAuthHeaders(options.headers || {}),
-  });
+  let response;
+  try {
+    response = await fetch(buildApiUrl(path), {
+      ...options,
+      headers: withAuthHeaders(options.headers || {}),
+    });
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error(
+        "Could not reach the API. If you are developing locally, run npm run dev and open http://localhost:3000.",
+      );
+    }
+    throw error;
+  }
   return response;
 }
 
@@ -98,6 +145,8 @@ async function waitForNano({ timeoutMs = 120_000, intervalMs = 2_000 } = {}) {
 }
 
 window.getApiBase = getApiBase;
+window.getConfiguredApiUrl = getConfiguredApiUrl;
+window.isCrossOriginApi = isCrossOriginApi;
 window.getApiKey = getApiKey;
 window.setApiConnection = setApiConnection;
 window.hasApiConnection = hasApiConnection;

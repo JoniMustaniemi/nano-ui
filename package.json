@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "description": "Thin web client for Nano Core",
   "scripts": {
-    "dev": "npx serve .",
+    "dev": "node scripts/dev-server.mjs",
+    "dev:static": "npx serve .",
     "vendor:three": "cp node_modules/three/build/three.module.min.js static/three.module.min.js"
   },
   "devDependencies": {

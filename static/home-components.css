@@ -86,9 +86,18 @@
   transition: opacity 200ms ease, visibility 200ms ease;
 }
 
+.view-modal:not(.open),
+.view-modal:not(.open) * {
+  pointer-events: none !important;
+}
+
 .view-modal.open {
   opacity: 1;
   visibility: visible;
+  pointer-events: auto;
+}
+
+.view-modal.open * {
   pointer-events: auto;
 }
 
@@ -184,6 +193,9 @@
 .nano-panel.active {
   opacity: 1;
   visibility: visible;
+}
+
+.view-modal.open .nano-panel.active {
   pointer-events: auto;
 }
 
@@ -552,7 +564,7 @@ body.inputs-locked #keyboard-toggle:disabled {
 @media (min-width: 600px) {
   :root {
     --content-max: 720px;
-    --footer-cluster-h: 128px;
+    --footer-cluster-h: 0px;
     --bottom-bar-h: 68px;
     --bottom-bar-offset: max(24px, env(safe-area-inset-bottom, 0));
     --page-pad-x: clamp(24px, 5vw, 64px);
@@ -616,7 +628,7 @@ body.inputs-locked #keyboard-toggle:disabled {
 
 @media (max-width: 380px) {
   :root {
-    --footer-cluster-h: 112px;
+    --footer-cluster-h: 0px;
     --bottom-bar-h: 58px;
   }
 

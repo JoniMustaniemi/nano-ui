@@ -234,7 +234,7 @@ async function sendVoiceCommand(audioBlob) {
     if (transcript) {
       showUserSpeech(transcript);
     }
-    const answerText = data.content || "";
+    let answerText = resolveSystemCommandConfirmation(data.content || "", transcript);
     const shouldSpeak = data.speak !== false;
     setAnswer(answerText, { deferClearUntilSpeech: shouldSpeak, allowDuringWorking: true });
     replyStatus.textContent = "";
