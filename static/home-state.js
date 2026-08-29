@@ -10,9 +10,7 @@ const replyStatus = document.getElementById("reply-status");
 const messageBox = document.getElementById("message");
 const sendButton = document.getElementById("send");
 const answerOutput = document.getElementById("answer-output");
-const confirmationActions = document.getElementById("confirmation-actions");
-const confirmationYesButton = document.getElementById("confirmation-yes");
-const confirmationNoButton = document.getElementById("confirmation-no");
+const inputActions = document.getElementById("input-actions");
 const voiceAudio = document.getElementById("voice-audio");
 const storageLog = document.getElementById("storage-log");
 const commandsToggle = document.getElementById("commands-toggle");
@@ -20,6 +18,12 @@ const commandsToggleReveal = document.getElementById("commands-toggle-reveal");
 const commandsList = document.getElementById("commands-list");
 const voiceVolumeInput = document.getElementById("voice-volume");
 const voiceVolumeValue = document.getElementById("voice-volume-value");
+const connectionUrlInput = document.getElementById("nano-connection-url");
+const connectionKeyInput = document.getElementById("nano-connection-key");
+const connectionStatus = document.getElementById("nano-connection-status");
+const connectionTestButton = document.getElementById("nano-connection-test");
+const connectionSettingsDropdown = document.getElementById("connection-settings-dropdown");
+const connectionSettingsSection = document.querySelector(".commands-connection-settings");
 const keyboardToggle = document.getElementById("keyboard-toggle");
 const keyboardPanel = document.getElementById("keyboard-panel");
 const viewModal = document.getElementById("view-modal");
@@ -63,6 +67,7 @@ const taskWaitTimer = document.getElementById("task-wait-timer");
 const taskWaitLabel = taskWaitTimer ? taskWaitTimer.querySelector(".task-wait-label") : null;
 const taskWaitClock = taskWaitTimer ? taskWaitTimer.querySelector(".task-wait-clock") : null;
 const activeTimersRoot = document.getElementById("active-timers");
+const activeStopwatchesRoot = document.getElementById("active-stopwatches");
 const controlsRevealZone = document.getElementById("controls-reveal-zone");
 const controlsRevealButton = document.getElementById("controls-reveal");
 const commandsRevealZone = document.getElementById("commands-reveal-zone");
@@ -101,6 +106,17 @@ let currentTaskTimer = null;
 let taskWaitClockInterval = null;
 let currentActiveTimers = [];
 let activeTimersInterval = null;
+const announcedTimerKeys = new Set();
+const seenActiveTimerKeys = new Set();
+const scheduledTimerExpiryTimeouts = new Map();
+const expiredTimerKeys = new Set();
+const expiredTimerSnapshots = new Map();
+const dismissedTimerKeys = new Set();
+const timerReminderIntervals = new Map();
+const localStopwatches = new Map();
+const stoppedStopwatchKeys = new Set();
+const ACTIVE_TIMER_TICK_MS = 100;
+const TIMER_REMINDER_INTERVAL_MS = 10000;
 let savedResponseBeforeWorking = null;
 let suppressWorkingResponse = false;
 const ANSWER_CLEAR_DELAY_MS = 20000;
@@ -128,6 +144,8 @@ let currentStandbyGreeting = "";
 let mainEssence = null;
 let toolCommands = [];
 let pendingSystemCommandId = null;
+let currentPendingSnapshot = null;
+let currentInputKind = null;
 let reconnectInProgress = false;
 const activityStates = ["standby", "working", "error"];
 let STANDBY_HEADLINE = "I'm in standby.";
@@ -145,6 +163,41 @@ let PRESENCE_LISTEN_DETAIL = "Hold the mic and say yes or no.";
 let WORKING_DETAIL_DEFAULT = "Give me a moment.";
 let RECEIVED_TITLE = "On it.";
 let RECEIVED_DETAIL = "Give me a moment.";
+const DEFAULT_TASK_ACK_POOL = [
+  "On it.",
+  "Got it.",
+  "Sure thing.",
+  "Right away.",
+  "Will do.",
+  "One moment.",
+  "Working on it.",
+  "Let me handle that.",
+  "I'm on it.",
+  "Okay, starting now.",
+  "Coming right up.",
+  "Got you covered.",
+  "Give me a sec.",
+  "Understood.",
+  "Leave it to me.",
+];
+let TASK_ACK_POOL = [...DEFAULT_TASK_ACK_POOL];
+let lastTaskAck = "";
+
+function pickTaskAck() {
+  if (TASK_ACK_POOL.length === 0) {
+    return RECEIVED_TITLE;
+  }
+  if (TASK_ACK_POOL.length === 1) {
+    lastTaskAck = TASK_ACK_POOL[0];
+    return lastTaskAck;
+  }
+  let pick = TASK_ACK_POOL[0];
+  do {
+    pick = TASK_ACK_POOL[Math.floor(Math.random() * TASK_ACK_POOL.length)];
+  } while (pick === lastTaskAck);
+  lastTaskAck = pick;
+  return pick;
+}
 
 function applyClientCopy(copy) {
   if (!copy || typeof copy !== "object") {
@@ -181,8 +234,18 @@ function applyClientCopy(copy) {
   if (copy.workingDetailDefault) {
     WORKING_DETAIL_DEFAULT = copy.workingDetailDefault;
   }
+  if (Array.isArray(copy.receivedAckPool) && copy.receivedAckPool.length > 0) {
+    TASK_ACK_POOL = copy.receivedAckPool
+      .filter((item) => typeof item === "string" && item.trim())
+      .map((item) => item.trim());
+  }
   if (copy.receivedTitle) {
     RECEIVED_TITLE = copy.receivedTitle;
+    if (TASK_ACK_POOL.length > 0) {
+      TASK_ACK_POOL[0] = RECEIVED_TITLE;
+    } else {
+      TASK_ACK_POOL = [RECEIVED_TITLE];
+    }
   }
   if (copy.receivedDetail) {
     RECEIVED_DETAIL = copy.receivedDetail;

@@ -13,14 +13,20 @@
 <link rel="icon" href="./static/favicon.svg" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="./static/favicon.svg" />
 
-<link rel="stylesheet" href="./static/home.css?v=active-timers-7" />
+<link rel="stylesheet" href="./static/home.css?v=active-timers-14" />
 <link rel="stylesheet" href="./static/nano-settings.css?v=1" />
 
 <script src="./config.js"></script>
 <script defer src="./static/nano-api.js?v=1"></script>
 <script defer src="./static/nano-settings.js?v=1"></script>
-<script defer src="./static/three.min.js?v=0.160.1"></script>
-<script defer src="./static/essence_visualizer.js?v=idle-essence-3"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "./static/three.module.min.js?v=0.160.1"
+  }
+}
+</script>
+<script type="module" src="./static/essence_visualizer.js?v=idle-essence-4"></script>
 <script type="module" src="./static/home-entry.js?v=module-entry-6"></script>
 
 </head>
@@ -41,10 +47,7 @@
 
 <div class="response-zone">
 <h1 id="answer-output" class="response-headline empty"></h1>
-<div id="confirmation-actions" class="confirmation-actions" hidden>
-<button id="confirmation-yes" class="confirmation-btn confirmation-btn-yes" type="button">Yes</button>
-<button id="confirmation-no" class="confirmation-btn confirmation-btn-no" type="button">No</button>
-</div>
+<div id="input-actions" class="input-actions confirmation-actions" hidden></div>
 </div>
 
 <div class="sr-only" id="state-line">standby</div>
@@ -59,7 +62,9 @@
 
 </p>
 
-<div id="active-timers" class="active-timers" hidden aria-live="off"></div>
+<div id="active-timers" class="active-timers" hidden aria-live="polite"></div>
+
+<div id="active-stopwatches" class="active-stopwatches" hidden aria-live="polite"></div>
 
 <section class="essence-zone" aria-hidden="true">
 
@@ -365,6 +370,20 @@ placeholder="No storage snapshot loaded yet."
 </div>
 
 <div id="view-panel-commands" class="view-panel view-panel-commands" hidden>
+
+<details id="connection-settings-dropdown" class="commands-dropdown commands-connection-dropdown">
+<summary class="commands-dropdown-toggle">Connection</summary>
+<section class="commands-settings-section commands-connection-settings" aria-label="Connection settings">
+<label class="connection-label" for="nano-connection-url">API URL</label>
+<input id="nano-connection-url" class="connection-input" type="url" placeholder="http://nano.local:8000" />
+<label class="connection-label" for="nano-connection-key">API key</label>
+<input id="nano-connection-key" class="connection-input" type="password" placeholder="API key" autocomplete="off" />
+<p id="nano-connection-status" class="nano-connection-status" aria-live="polite"></p>
+<div class="nano-connection-actions">
+<button id="nano-connection-test" type="button">Test connection</button>
+</div>
+</section>
+</details>
 
 <section class="commands-voice-settings" aria-label="Voice settings">
 <div class="commands-voice-header">

@@ -26,7 +26,26 @@ const LAST_COMMAND_CATEGORIES = ["System"];
 const EXCLUDED_COMMAND_CATEGORIES = new Set(["git", "github"]);
 const GIT_PR_COMMAND_PATTERN =
   /\b(commit|pull request|pull_request|create pr|gh pr|git push|git commit)\b/i;
+const ACTIVE_TIMERS_COMMAND_PATTERN = /\bactive\s+timers?\b/i;
 const YES_NO_PENDING_KINDS = new Set(["wipe_confirmation", "presence_check"]);
+const YES_NO_INPUT_ACTIONS = [
+  { label: "Yes", value: "yes", variant: "yes" },
+  { label: "No", value: "no", variant: "no" },
+];
+const TIMER_DURATION_INPUT_ACTIONS = [
+  { label: "1 min", value: "1 minute" },
+  { label: "5 min", value: "5 minutes" },
+  { label: "10 min", value: "10 minutes" },
+  { label: "15 min", value: "15 minutes" },
+  { label: "30 min", value: "30 minutes" },
+  { label: "1 hour", value: "1 hour" },
+  { label: "Cancel", value: "cancel", variant: "no" },
+];
+const GENERIC_INPUT_ACTIONS = [
+  { label: "Type answer", action: "open_keyboard" },
+  { label: "Cancel", value: "cancel", variant: "no" },
+];
+const FREE_TEXT_PENDING_KINDS = new Set(["note_name", "note_content"]);
 
 const VIEW_CLIENT_ACTIONS = {
   open_brains: "brains",
@@ -158,25 +177,86 @@ async function loadAndRenderToolCommands() {
 
 function setYesNoConfirmationActive(active) {
   waitingForYesNoConfirmation = active;
-  syncConfirmationActions();
+  syncInputActions();
 }
 
-function syncConfirmationActions() {
-  if (!confirmationActions) {
+function normalizePendingOptions(options) {
+  if (!Array.isArray(options)) {
+    return [];
+  }
+  return options
+    .map((option, index) => {
+      if (typeof option === "string") {
+        const text = option.trim();
+        return text ? { label: text, value: text } : null;
+      }
+      if (!option || typeof option !== "object") {
+        return null;
+      }
+      const label = String(option.label || option.title || option.name || `Option ${index + 1}`).trim();
+      const value = String(option.value || option.label || option.title || option.name || label).trim();
+      return label && value ? { label, value } : null;
+    })
+    .filter(Boolean);
+}
+
+function getInputActionsForCurrentState() {
+  if (waitingForYesNoConfirmation || waitingForPresence) {
+    return YES_NO_INPUT_ACTIONS;
+  }
+  if (currentAnswerPendingKind && YES_NO_PENDING_KINDS.has(currentAnswerPendingKind)) {
+    return YES_NO_INPUT_ACTIONS;
+  }
+  if (currentAnswerPendingKind === "timer_duration" || currentInputKind === "timer_duration") {
+    return TIMER_DURATION_INPUT_ACTIONS;
+  }
+  if (currentAnswerPendingKind === "note_selection") {
+    const optionActions = normalizePendingOptions(currentPendingSnapshot?.options);
+    if (optionActions.length) {
+      return [...optionActions, { label: "Cancel", value: "cancel", variant: "no" }];
+    }
+  }
+  if (currentAnswerPendingKind && FREE_TEXT_PENDING_KINDS.has(currentAnswerPendingKind)) {
+    return GENERIC_INPUT_ACTIONS;
+  }
+  if (isWaitingForUserAnswer()) {
+    return GENERIC_INPUT_ACTIONS;
+  }
+  return [];
+}
+
+function renderInputActionButton(action, disabled) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "confirmation-btn input-action-btn";
+  if (action.variant === "yes") {
+    button.classList.add("confirmation-btn-yes");
+  }
+  button.textContent = action.label;
+  button.disabled = disabled;
+  button.dataset.inputAction = action.action || "submit";
+  if (action.value) {
+    button.dataset.inputValue = action.value;
+  }
+  return button;
+}
+
+function syncInputActions() {
+  if (!inputActions) {
     return;
   }
-  const show =
-    waitingForYesNoConfirmation ||
-    waitingForPresence ||
-    (currentAnswerPendingKind && YES_NO_PENDING_KINDS.has(currentAnswerPendingKind));
-  confirmationActions.hidden = !show;
-  const disabled = requestInFlight || reconnectInProgress || getDisplayState() === "working";
-  if (confirmationYesButton) {
-    confirmationYesButton.disabled = disabled;
+  const actions = getInputActionsForCurrentState();
+  const disabled = requestInFlight || reconnectInProgress;
+  inputActions.hidden = !actions.length;
+  inputActions.replaceChildren();
+  if (!actions.length) {
+    return;
   }
-  if (confirmationNoButton) {
-    confirmationNoButton.disabled = disabled;
+  const fragment = document.createDocumentFragment();
+  for (const action of actions) {
+    fragment.appendChild(renderInputActionButton(action, disabled));
   }
+  inputActions.appendChild(fragment);
 }
 
 function setCommandButtonsDisabled(disabled) {
@@ -227,7 +307,7 @@ function updateInputLock() {
   nanoControlsToggle.disabled = locked;
   keyboardToggle.disabled = locked;
   setCommandButtonsDisabled(locked);
-  syncConfirmationActions();
+  syncInputActions();
   document.body.classList.toggle("inputs-locked", locked);
 }
 
@@ -251,8 +331,15 @@ function isExcludedToolCommand(command) {
   if (EXCLUDED_COMMAND_CATEGORIES.has(category)) {
     return true;
   }
+  const id = String(command?.id || "").trim().toLowerCase();
+  if (id === "active_timers" || id === "list_active_timers") {
+    return true;
+  }
   const searchable = `${command?.id || ""} ${command?.message || ""} ${command?.label || ""}`;
-  return GIT_PR_COMMAND_PATTERN.test(searchable);
+  return (
+    GIT_PR_COMMAND_PATTERN.test(searchable) ||
+    ACTIVE_TIMERS_COMMAND_PATTERN.test(searchable)
+  );
 }
 
 function filterToolCommands(commands) {
@@ -271,8 +358,39 @@ async function loadToolCommands() {
   return filterToolCommands(commands);
 }
 
+function isTimerToolCommand(command) {
+  const id = String(command?.id || "").toLowerCase();
+  const action = String(command?.client_action || "").toLowerCase();
+  const message = String(command?.message || "").toLowerCase();
+  const label = String(command?.label || "").toLowerCase();
+  return (
+    action.includes("timer") ||
+    id.includes("timer") ||
+    /\btimer\b/.test(message) ||
+    /\btimer\b/.test(label)
+  );
+}
+
+function resolveToolCommandMessage(command) {
+  const message = String(command?.message || "").trim();
+  if (message) {
+    return message;
+  }
+  if (isTimerToolCommand(command)) {
+    return "Start a timer";
+  }
+  const label = String(command?.label || "").trim();
+  if (label) {
+    return label;
+  }
+  return String(command?.id || "")
+    .replace(/_/g, " ")
+    .trim();
+}
+
 async function runToolCommand(command) {
   if (isBusy()) {
+    replyStatus.textContent = "I'm still working. Wait for the current task to finish.";
     return;
   }
   const clientAction = String(command?.client_action || "").trim();
@@ -288,13 +406,15 @@ async function runToolCommand(command) {
     await openViewSession(view, { source: "ui" });
     return;
   }
-  const message = command.message;
-  messageBox.value = message;
+  const message = resolveToolCommandMessage(command);
+  if (!message) {
+    replyStatus.textContent = "This command has no message configured.";
+    return;
+  }
   if (isViewSessionActive()) {
-    closeViewSession({ reason: "ui" });
+    closeViewSession({ reason: "ui", restoreWake: false });
   }
   await submitMessage(message, "command", command);
-  messageBox.value = "";
 }
 
 function normalizeUiCommandText(message) {
@@ -926,6 +1046,9 @@ function startWorkingResponse() {
   if (answerOutput.classList.contains("working")) {
     return;
   }
+  if (answerOutput.dataset.taskAck === "true") {
+    return;
+  }
   if (suppressWorkingResponse && !requestInFlight) {
     return;
   }
@@ -995,7 +1118,7 @@ function renderState() {
   }
   updateEssenceState();
   updateInputLock();
-  syncConfirmationActions();
+  syncInputActions();
 }
 
 function resetVoiceListeningMode() {
@@ -1222,6 +1345,7 @@ function setAnswer(text, options = {}) {
   const content = text.trim();
   const animate = options.animate !== false;
   const bypassSpeechGuard = options.bypassSpeechGuard === true;
+  const isTaskAck = options.isTaskAck === true;
   const isBaseState = options.isBaseState === true || isBaseAnswerContent(content);
   const preserveWorkingDots =
     !options.allowDuringWorking &&
@@ -1250,16 +1374,22 @@ function setAnswer(text, options = {}) {
   if (!content) {
     answerOutput.textContent = "";
     answerOutput.classList.add("empty");
+    delete answerOutput.dataset.taskAck;
     applyResponseTypography(IDLE_RESPONSE.length);
     renderActivityStatus();
     return;
+  }
+  if (isTaskAck) {
+    answerOutput.dataset.taskAck = "true";
+  } else {
+    delete answerOutput.dataset.taskAck;
   }
   answerOutput.classList.remove("empty");
   applyResponseTypography(content.length);
 
   const finish = () => {
     renderActivityStatus();
-    if (isBaseState || isWaitingForUserAnswer()) {
+    if (isBaseState || isWaitingForUserAnswer() || isTaskAck) {
       return;
     }
     if (shouldDeferAnswerClear(options)) {

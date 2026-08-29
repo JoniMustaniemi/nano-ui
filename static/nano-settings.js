@@ -1,75 +1,236 @@
-function ensureConnectionSettingsUi() {
-  let overlay = document.getElementById("nano-connection-settings");
+const WAITING_MESSAGES = [
+  "Searching for your Raspberry Pi on the network...",
+  "Nano lives on your Pi — set the API URL in Connection settings.",
+  "Make sure your Pi is powered on and reachable.",
+  "I'll connect automatically once I find it.",
+];
+
+const CONNECTION_POLL_INTERVAL_MS = 5_000;
+
+let connectionSettingsInitialized = false;
+let connectionPollAbort = null;
+let messageRotateTimer = null;
+let messageIndex = 0;
+let connectionCompleting = false;
+
+function refreshConnectionFields() {
+  if (!connectionUrlInput || !connectionKeyInput) {
+    return;
+  }
+  connectionUrlInput.value = getApiBase();
+  connectionKeyInput.value = getApiKey();
+}
+
+function initConnectionSettings() {
+  if (!connectionUrlInput || !connectionKeyInput) {
+    return;
+  }
+
+  if (!connectionSettingsInitialized) {
+    connectionSettingsInitialized = true;
+
+    connectionTestButton?.addEventListener("click", async () => {
+      setApiConnection(connectionUrlInput.value, connectionKeyInput.value);
+      if (!hasApiConnection()) {
+        if (connectionStatus) {
+          connectionStatus.textContent = "API URL is required.";
+        }
+        return;
+      }
+      if (connectionStatus) {
+        connectionStatus.textContent = "Testing connection...";
+      }
+      try {
+        const response = await nanoFetch("/api/health");
+        if (!response.ok) {
+          throw new Error(`Health check failed (${response.status}).`);
+        }
+        const payload = await response.json();
+        if (connectionStatus) {
+          connectionStatus.textContent = `Connected to ${payload.app} (${payload.status}).`;
+        }
+        await handleConnectionSuccess();
+      } catch (error) {
+        if (connectionStatus) {
+          connectionStatus.textContent = error.message;
+        }
+      }
+    });
+  }
+
+  refreshConnectionFields();
+}
+
+async function handleConnectionSuccess() {
+  if (connectionCompleting) {
+    return;
+  }
+  connectionCompleting = true;
+
+  stopConnectionPoll();
+  hideWaitingOverlay();
+
+  if (typeof stateLine !== "undefined" && stateLine) {
+    stateLine.textContent = "standby";
+  }
+  if (typeof updateEssenceState === "function") {
+    updateEssenceState();
+  }
+
+  if (typeof completeStartupAfterConnection === "function") {
+    await completeStartupAfterConnection();
+    return;
+  }
+
+  if (typeof bootstrap === "function") {
+    await bootstrap();
+  }
+}
+
+function ensureWaitingOverlay() {
+  let overlay = document.getElementById("nano-waiting-overlay");
   if (overlay) {
     return overlay;
   }
 
   overlay = document.createElement("section");
-  overlay.id = "nano-connection-settings";
-  overlay.className = "nano-connection-settings";
+  overlay.id = "nano-waiting-overlay";
+  overlay.className = "nano-waiting-overlay";
+  overlay.hidden = true;
   overlay.innerHTML = `
-    <div class="nano-connection-panel" role="dialog" aria-labelledby="nano-connection-title">
-      <h2 id="nano-connection-title">Connect to Nano</h2>
-      <p>Enter your Pi API URL and key.</p>
-      <label for="nano-connection-url">API URL</label>
-      <input id="nano-connection-url" type="url" placeholder="https://your-pi.example.com" />
-      <label for="nano-connection-key">API key</label>
-      <input id="nano-connection-key" type="password" placeholder="API key" autocomplete="off" />
-      <p id="nano-connection-status" class="nano-connection-status" aria-live="polite"></p>
-      <div class="nano-connection-actions">
-        <button id="nano-connection-test" type="button">Test connection</button>
-        <button id="nano-connection-save" type="button">Connect</button>
-      </div>
+    <div class="nano-waiting-content" role="status" aria-live="polite">
+      <h2 class="nano-waiting-headline">Waiting for Nano...</h2>
+      <p id="nano-waiting-detail" class="nano-waiting-detail"></p>
+      <p id="nano-waiting-status" class="nano-waiting-status">Checking connection</p>
     </div>
   `;
   document.body.appendChild(overlay);
 
-  const urlInput = overlay.querySelector("#nano-connection-url");
-  const keyInput = overlay.querySelector("#nano-connection-key");
-  const status = overlay.querySelector("#nano-connection-status");
-  const testButton = overlay.querySelector("#nano-connection-test");
-  const saveButton = overlay.querySelector("#nano-connection-save");
-
-  urlInput.value = getApiBase();
-  keyInput.value = getApiKey();
-
-  testButton.addEventListener("click", async () => {
-    setApiConnection(urlInput.value, keyInput.value);
-    status.textContent = "Testing connection...";
-    try {
-      const response = await nanoFetch("/api/health");
-      if (!response.ok) {
-        throw new Error(`Health check failed (${response.status}).`);
-      }
-      const payload = await response.json();
-      status.textContent = `Connected to ${payload.app} (${payload.status}).`;
-    } catch (error) {
-      status.textContent = error.message;
-    }
-  });
-
-  saveButton.addEventListener("click", async () => {
-    setApiConnection(urlInput.value, keyInput.value);
-    if (!hasApiConnection()) {
-      status.textContent = "API URL is required.";
-      return;
-    }
-    status.textContent = "Connecting...";
-    try {
-      const response = await nanoFetch("/api/health");
-      if (!response.ok) {
-        throw new Error(`Could not connect (${response.status}).`);
-      }
-      overlay.hidden = true;
-      if (typeof bootstrap === "function") {
-        await bootstrap();
-      }
-    } catch (error) {
-      status.textContent = error.message;
-    }
-  });
-
   return overlay;
+}
+
+function setWaitingDetail(text) {
+  const detail = document.getElementById("nano-waiting-detail");
+  if (!detail) {
+    return;
+  }
+  detail.textContent = text;
+}
+
+function rotateWaitingMessage() {
+  const detail = document.getElementById("nano-waiting-detail");
+  if (!detail) {
+    return;
+  }
+
+  detail.classList.add("is-fading");
+  window.setTimeout(() => {
+    messageIndex = (messageIndex + 1) % WAITING_MESSAGES.length;
+    setWaitingDetail(WAITING_MESSAGES[messageIndex]);
+    detail.classList.remove("is-fading");
+  }, 400);
+}
+
+function startWaitingMessageRotation() {
+  stopWaitingMessageRotation();
+  messageIndex = 0;
+  setWaitingDetail(WAITING_MESSAGES[messageIndex]);
+  messageRotateTimer = window.setInterval(rotateWaitingMessage, 4_000);
+}
+
+function stopWaitingMessageRotation() {
+  if (messageRotateTimer) {
+    window.clearInterval(messageRotateTimer);
+    messageRotateTimer = null;
+  }
+}
+
+function updateWaitingStatus(attempt) {
+  const status = document.getElementById("nano-waiting-status");
+  if (!status) {
+    return;
+  }
+  status.textContent =
+    attempt <= 1 ? "Checking connection" : "Still waiting — retrying";
+}
+
+function showWaitingOverlay() {
+  const overlay = ensureWaitingOverlay();
+  overlay.hidden = false;
+  document.body.classList.add("connection-waiting");
+
+  if (typeof stateLine !== "undefined" && stateLine) {
+    stateLine.textContent = "reconnecting";
+  }
+  if (typeof updateEssenceState === "function") {
+    updateEssenceState();
+  }
+
+  updateWaitingStatus(0);
+  startWaitingMessageRotation();
+}
+
+function hideWaitingOverlay() {
+  const overlay = document.getElementById("nano-waiting-overlay");
+  if (overlay) {
+    overlay.hidden = true;
+  }
+  document.body.classList.remove("connection-waiting");
+  stopWaitingMessageRotation();
+}
+
+function stopConnectionPoll() {
+  if (connectionPollAbort) {
+    connectionPollAbort();
+    connectionPollAbort = null;
+  }
+}
+
+function startConnectionPoll() {
+  stopConnectionPoll();
+
+  let aborted = false;
+  connectionPollAbort = () => {
+    aborted = true;
+  };
+
+  void (async () => {
+    let attempt = 0;
+    while (!aborted) {
+      if (hasApiConnection()) {
+        try {
+          const response = await nanoFetch("/api/health");
+          if (response.ok) {
+            await handleConnectionSuccess();
+            return;
+          }
+        } catch (_error) {
+          // Keep polling until timeout or success.
+        }
+      }
+
+      attempt += 1;
+      updateWaitingStatus(attempt);
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, CONNECTION_POLL_INTERVAL_MS);
+      });
+    }
+  })();
+}
+
+async function openConnectionSettings() {
+  if (typeof openViewSession === "function") {
+    await openViewSession("commands", { source: "ui" });
+  }
+  if (typeof initConnectionSettings === "function") {
+    initConnectionSettings();
+  }
+  if (connectionSettingsDropdown) {
+    connectionSettingsDropdown.open = true;
+  }
+  if (connectionSettingsSection) {
+    connectionSettingsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 }
 
 async function ensureApiConnection() {
@@ -80,13 +241,22 @@ async function ensureApiConnection() {
         return true;
       }
     } catch (_error) {
-      // Fall through to settings UI.
+      // Fall through to waiting overlay.
     }
   }
 
-  const overlay = ensureConnectionSettingsUi();
-  overlay.hidden = false;
+  showWaitingOverlay();
+  startConnectionPoll();
+
+  if (!hasApiConnection()) {
+    requestAnimationFrame(() => {
+      void openConnectionSettings();
+    });
+  }
+
   return false;
 }
 
 window.ensureApiConnection = ensureApiConnection;
+window.initConnectionSettings = initConnectionSettings;
+window.openConnectionSettings = openConnectionSettings;

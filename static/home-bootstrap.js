@@ -1,12 +1,20 @@
 sendButton.addEventListener("click", sendMessage);
-if (confirmationYesButton) {
-  confirmationYesButton.addEventListener("click", () => {
-    void submitConfirmationAnswer("yes");
-  });
-}
-if (confirmationNoButton) {
-  confirmationNoButton.addEventListener("click", () => {
-    void submitConfirmationAnswer("no");
+if (inputActions) {
+  inputActions.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-input-action]");
+    if (!button || button.disabled) {
+      return;
+    }
+    const action = button.dataset.inputAction;
+    if (action === "open_keyboard") {
+      openKeyboardPanel();
+      messageBox.focus();
+      return;
+    }
+    const value = button.dataset.inputValue;
+    if (value) {
+      void submitInputAnswer(value);
+    }
   });
 }
 commandsToggle.addEventListener("click", () => {
@@ -122,6 +130,17 @@ async function loadNanoVersionFromBackend() {
 }
 
 window.loadNanoVersionFromBackend = loadNanoVersionFromBackend;
+
+async function completeStartupAfterConnection() {
+  await loadNanoVersionFromBackend();
+  void initVoiceVolumeControl();
+  restoreBaseAnswer();
+  setVoiceStatus("Voice on standby.");
+  syncVoiceListeningState();
+  await bootstrap();
+}
+
+window.completeStartupAfterConnection = completeStartupAfterConnection;
 
 window.addEventListener("load", () => {
   requestAnimationFrame(async () => {

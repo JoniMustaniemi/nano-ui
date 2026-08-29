@@ -216,6 +216,7 @@ async function sendVoiceCommand(audioBlob) {
   }
 
   requestInFlight = true;
+  await acknowledgeRequest("voice");
   setVoiceStatus("Sending audio to Nano...");
   try {
     const formData = new FormData();
@@ -240,6 +241,38 @@ async function sendVoiceCommand(audioBlob) {
     await refreshStorage();
     if (shouldSpeak && answerText) {
       await playVoice(answerText);
+    }
+    if (answerText) {
+      const systemResponse = handleSystemCommandResponse(answerText);
+      if (systemResponse.handled) {
+        if (systemResponse.reconnect) {
+          returnToWakeDetection();
+          void beginNanoReconnect(systemResponse.kind);
+          return;
+        }
+        returnToWakeDetection();
+        return;
+      }
+      if (isWaitingForUserAnswer()) {
+        ensureDirectAnswerListening();
+        return;
+      }
+      const needsVoiceFollowUp = answerNeedsVoiceFollowUp(answerText);
+      if (needsVoiceFollowUp) {
+        const isYesNoConfirmation =
+          answerNeedsYesNoConfirmation(answerText) ||
+          answerText.toLowerCase().includes("reply yes to proceed or no to cancel") ||
+          Boolean(pendingSystemCommandId);
+        const isTimerFollowUp = answerNeedsTimerDuration(answerText);
+        const followUpPrompt = isYesNoConfirmation
+          ? "Reply yes to confirm or no to cancel."
+          : "Hold the mic button and speak your answer.";
+        armVoiceFollowUp(followUpPrompt, {
+          yesNo: isYesNoConfirmation,
+          inputKind: isTimerFollowUp ? "timer_duration" : null,
+        });
+        return;
+      }
     }
     waitingForVoiceAnswer = false;
     setVoiceStatus("Hold the mic button to talk. Processing happens on the Pi.");
@@ -325,13 +358,19 @@ function stopVoiceLevelMonitor() {
 
 async function playVoice(text, options = {}) {
   const content = (text || "").trim();
-  if (content) {
+  const forcePlayback = options.forcePlayback === true;
+  if (content && !options.skipAnswerUpdate) {
     setAnswer(content, {
       animate: false,
-      deferClearUntilSpeech: Boolean(voiceAvailable),
+      allowDuringWorking: options.allowDuringWorking === true,
+      deferClearUntilSpeech: Boolean(voiceAvailable || forcePlayback),
     });
   }
-  if (!voiceAvailable || !content) {
+  if (!content) {
+    resumeAnswerClearAfterSpeech();
+    return;
+  }
+  if (!voiceAvailable && !forcePlayback) {
     resumeAnswerClearAfterSpeech();
     return;
   }
@@ -341,7 +380,8 @@ async function playVoice(text, options = {}) {
 }
 
 async function playVoiceNow(text, options = {}) {
-  if (!voiceAvailable || !text.trim()) {
+  const forcePlayback = options.forcePlayback === true;
+  if ((!voiceAvailable && !forcePlayback) || !text.trim()) {
     return;
   }
   clearVoiceSource();
@@ -402,11 +442,23 @@ function answerNeedsYesNoConfirmation(text) {
   return lowered.includes("yes") && lowered.includes("no");
 }
 
-function answerNeedsVoiceFollowUp(text) {
+function answerNeedsTimerDuration(text) {
   const lowered = text.toLowerCase();
   return (
     lowered.includes("how long should the timer run") ||
     lowered.includes("didn't catch a duration") ||
+    lowered.includes("how long should i set the timer") ||
+    lowered.includes("what duration") ||
+    (/\bhow long\b/.test(lowered) && /\btimer\b/.test(lowered)) ||
+    (/\bhow many\b/.test(lowered) &&
+      /\b(minute|minutes|second|seconds|hour|hours)\b/.test(lowered))
+  );
+}
+
+function answerNeedsVoiceFollowUp(text) {
+  const lowered = text.toLowerCase();
+  return (
+    answerNeedsTimerDuration(text) ||
     lowered.includes("reply yes to proceed or no to cancel") ||
     answerNeedsYesNoConfirmation(text)
   );
@@ -436,6 +488,7 @@ function ensureDirectAnswerListening(statusText) {
   setVoiceStatus(voiceAnswerPrompt);
   syncVoiceListeningState();
   renderState();
+  syncInputActions();
   if (!speakingActive) {
     scheduleAnswerTimeout();
   } else {
@@ -486,11 +539,16 @@ async function handlePresenceDismissal(message) {
   returnToWakeDetection();
 }
 
-function armVoiceFollowUp(text, { yesNo = false } = {}) {
+function armVoiceFollowUp(text, { yesNo = false, inputKind = null } = {}) {
   if (yesNo) {
     setYesNoConfirmationActive(true);
+    currentInputKind = null;
+  } else {
+    waitingForFollowUp = true;
+    currentInputKind = inputKind;
   }
   ensureDirectAnswerListening(text || "Hold the mic button and speak your answer.");
+  syncInputActions();
 }
 
 function returnToWakeDetection() {
@@ -499,7 +557,9 @@ function returnToWakeDetection() {
   waitingForPresence = false;
   waitingForYesNoConfirmation = false;
   currentAnswerPendingKind = null;
-  syncConfirmationActions();
+  currentPendingSnapshot = null;
+  currentInputKind = null;
+  syncInputActions();
   setVoiceStatus("Hold the mic button to talk. Processing happens on the Pi.");
   syncVoiceListeningState();
   renderState();

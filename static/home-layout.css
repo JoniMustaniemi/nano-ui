@@ -193,6 +193,7 @@ body[data-display-state="working"] .commands-reveal-zone {
 }
 
 .shell {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100dvh;
@@ -283,15 +284,19 @@ body[data-display-state="working"] .commands-reveal-zone {
   -webkit-text-fill-color: transparent;
 }
 
-.confirmation-actions {
+.confirmation-actions,
+.input-actions {
   display: flex;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 10px;
   margin-top: 14px;
   padding: 0 8px;
+  max-width: 100%;
 }
 
-.confirmation-actions[hidden] {
+.confirmation-actions[hidden],
+.input-actions[hidden] {
   display: none !important;
 }
 
@@ -395,25 +400,127 @@ body[data-display-state="working"] .commands-reveal-zone {
   font-weight: 600;
 }
 
-.active-timers {
-  flex: 1 1 auto;
+.active-timers,
+.active-stopwatches {
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
-  gap: clamp(12px, 2vh, 22px);
+  gap: clamp(4px, 0.8vh, 8px);
   width: 100%;
-  max-width: var(--content-max);
-  margin: 0 auto;
+  max-width: min(100%, 22rem);
+  margin: 0 auto clamp(2px, 0.5vh, 6px);
   padding: 0 clamp(8px, 2vw, 16px);
-  min-height: 0;
-  overflow-y: auto;
+  overflow: visible;
   text-align: center;
-  pointer-events: none;
 }
 
-.active-timers[hidden] {
+body.has-active-timers .top-zone,
+body.has-active-stopwatches .top-zone {
+  max-height: 34dvh;
+}
+
+body.has-active-timers .user-speech,
+body.has-active-stopwatches .user-speech {
+  margin-bottom: clamp(2px, 0.5vh, 6px);
+}
+
+body.has-active-timers .essence-zone,
+body.has-active-stopwatches .essence-zone {
+  flex: 1 1 0;
+  min-height: min(36vh, 46vw);
+}
+
+@media (min-width: 600px) {
+  .active-timers {
+    position: fixed;
+    top: 50%;
+    right: max(10px, env(safe-area-inset-right, 0px));
+    transform: translateY(-50%);
+    width: min(10.5rem, 22vw);
+    max-width: 10.5rem;
+    max-height: min(70dvh, calc(100dvh - var(--footer-cluster-h) - 48px));
+    margin: 0;
+    padding: 0 0 0 8px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(57, 255, 20, 0.28) transparent;
+    z-index: 5;
+    align-items: stretch;
+  }
+
+  .active-stopwatches {
+    position: fixed;
+    top: 50%;
+    left: max(10px, env(safe-area-inset-left, 0px));
+    transform: translateY(-50%);
+    width: min(10.5rem, 22vw);
+    max-width: 10.5rem;
+    max-height: min(70dvh, calc(100dvh - var(--footer-cluster-h) - 48px));
+    margin: 0;
+    padding: 0 8px 0 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(57, 255, 20, 0.28) transparent;
+    z-index: 5;
+    align-items: stretch;
+  }
+
+  body.has-active-timers .top-zone,
+  body.has-active-stopwatches .top-zone {
+    max-height: 46dvh;
+  }
+
+  body.has-active-timers .essence-zone,
+  body.has-active-stopwatches .essence-zone {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+}
+
+@media (max-width: 599px) {
+  .active-timers-grid,
+  .active-stopwatches-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-items: center;
+    align-items: stretch;
+    gap: clamp(6px, 1vh, 10px);
+    width: 100%;
+  }
+
+  .active-timers-grid .active-timer-item,
+  .active-stopwatches-grid .active-timer-item {
+    width: 100%;
+    max-width: 10.5rem;
+    min-width: 0;
+  }
+
+  .active-timers-grid .active-timer-item:only-child,
+  .active-stopwatches-grid .active-timer-item:only-child {
+    grid-column: 1 / -1;
+    justify-self: center;
+  }
+
+  .active-timers-grid--single-type .active-timer-item:only-child,
+  .active-stopwatches-grid--single-type .active-timer-item:only-child {
+    margin-inline: 0;
+  }
+}
+
+.active-timers[hidden],
+.active-stopwatches[hidden] {
   display: none;
+}
+
+.active-timers .active-timer-item,
+.active-timers .active-timer-action,
+.active-stopwatches .active-timer-item,
+.active-stopwatches .active-timer-action {
+  pointer-events: auto;
 }
 
 .active-timers-section {
@@ -423,13 +530,42 @@ body[data-display-state="working"] .commands-reveal-zone {
   width: 100%;
 }
 
+@media (min-width: 600px) {
+  .active-timers-section,
+  .active-stopwatches-section {
+    align-items: stretch;
+  }
+
+  .active-timers-section-title,
+  .active-stopwatches-section-title {
+    text-align: center;
+  }
+
+  .active-timers-grid,
+  .active-stopwatches-grid {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .active-timer-item {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+  }
+
+  .active-timers-grid--single-type .active-timer-item:only-child,
+  .active-stopwatches-grid--single-type .active-timer-item:only-child {
+    margin-inline: 0;
+  }
+}
+
 .active-timers-section-title {
-  margin: 0 0 clamp(6px, 1vh, 10px);
+  margin: 0 0 clamp(4px, 0.6vh, 6px);
   color: var(--accent-soft);
   font-family: "Segoe UI", system-ui, sans-serif;
-  font-size: 0.68rem;
+  font-size: 0.58rem;
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
   line-height: 1.2;
   text-transform: uppercase;
 }
@@ -438,8 +574,8 @@ body[data-display-state="working"] .commands-reveal-zone {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  align-items: center;
-  gap: clamp(8px, 1.4vh, 16px) clamp(12px, 2vw, 20px);
+  align-items: stretch;
+  gap: clamp(6px, 1vh, 10px);
   width: 100%;
 }
 
@@ -448,39 +584,203 @@ body[data-display-state="working"] .commands-reveal-zone {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  flex: 0 0 calc(25% - 0.9rem);
-  max-width: calc(25% - 0.9rem);
-  min-width: 4.5rem;
-  min-height: 0;
+  gap: 0.35rem;
+  flex: 0 1 auto;
+  max-width: min(100%, 9.5rem);
+  min-width: min(100%, 8.5rem);
+  padding: 0.55rem 0.7rem 0.5rem;
+  border-radius: 12px;
+  border: 1px solid rgba(57, 255, 20, 0.16);
+  background:
+    linear-gradient(180deg, rgba(57, 255, 20, 0.08) 0%, rgba(0, 0, 0, 0.42) 100%);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
 }
 
-.active-timers-grid--single-type .active-timer-item:only-child {
-  flex: 0 0 100%;
-  max-width: 100%;
+.active-timer-item--hero {
+  flex: 0 1 auto;
+  width: auto;
+  max-width: min(100%, 9.5rem);
+  padding: 0.55rem 0.7rem 0.5rem;
+}
+
+.active-timer-item--stopwatch {
+  border-color: rgba(18, 210, 160, 0.2);
+  background:
+    linear-gradient(180deg, rgba(18, 210, 160, 0.1) 0%, rgba(0, 0, 0, 0.42) 100%);
+}
+
+.active-timer-item--overdue {
+  border-color: rgba(255, 120, 72, 0.34);
+  background:
+    linear-gradient(180deg, rgba(255, 120, 72, 0.14) 0%, rgba(0, 0, 0, 0.46) 100%);
+  box-shadow: 0 0 28px rgba(255, 120, 72, 0.12);
+}
+
+.active-timer-item--overdue .active-timer-kind {
+  border-color: rgba(255, 120, 72, 0.34);
+  color: #ffb08a;
+}
+
+.active-timer-item--overdue .active-timer-clock {
+  color: #ff9b6e;
+  text-shadow: 0 0 24px rgba(255, 120, 72, 0.22);
+}
+
+.active-timer-item--overdue .active-timer-meta {
+  color: #ff9b6e;
+}
+
+.active-timer-progress--overdue {
+  background: rgba(255, 120, 72, 0.16);
+}
+
+.active-timer-progress--overdue .active-timer-progress-indeterminate {
+  background: linear-gradient(90deg, transparent, rgba(255, 120, 72, 0.72), transparent);
+}
+
+.active-timer-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem 0.45rem;
+}
+
+.active-timer-kind {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid rgba(57, 255, 20, 0.22);
+  color: var(--accent-strong);
+  font: 700 0.52rem/1 "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.active-timer-item--stopwatch .active-timer-kind {
+  border-color: rgba(18, 210, 160, 0.28);
+  color: #8ef0d2;
 }
 
 .active-timer-label {
-  margin-bottom: 0.25rem;
-  color: var(--accent-soft);
+  color: var(--text);
   font-family: "Segoe UI", system-ui, sans-serif;
-  font-size: clamp(0.9rem, 2vw, 1rem);
+  font-size: clamp(0.72rem, 1.6vw, 0.82rem);
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   line-height: 1.2;
 }
 
 .active-timer-clock {
+  display: block;
   color: var(--accent-strong);
-  font: 700 clamp(1.6rem, 4.5vw, 2.75rem) / 1 "Cascadia Mono", "Consolas", monospace;
+  font: 700 clamp(1.15rem, 4.2vw, 1.55rem) / 1.05 "Cascadia Mono", "Consolas", monospace;
   letter-spacing: 0.04em;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 20px rgba(57, 255, 20, 0.2);
+  text-shadow: 0 0 14px rgba(57, 255, 20, 0.16);
+  -webkit-text-fill-color: currentColor;
+  background: none;
 }
 
-.active-timers-grid--single-type .active-timer-item:only-child .active-timer-clock {
-  font-size: clamp(3.5rem, 14vw, 7rem);
-  letter-spacing: 0.06em;
-  text-shadow: 0 0 28px rgba(57, 255, 20, 0.22);
+.active-timer-item--hero .active-timer-clock {
+  font-size: clamp(1.15rem, 4.2vw, 1.55rem);
+}
+
+.active-timer-item--stopwatch .active-timer-clock {
+  color: #9ef5dc;
+  text-shadow: 0 0 24px rgba(18, 210, 160, 0.2);
+}
+
+.active-timer-meta {
+  color: var(--muted);
+  font: 600 0.58rem/1.2 "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.active-timer-progress {
+  width: 100%;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(57, 255, 20, 0.1);
+}
+
+.active-timer-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(57, 255, 20, 0.72), var(--accent-strong));
+  transition: width 1s linear;
+}
+
+.active-timer-progress--stopwatch {
+  background: rgba(18, 210, 160, 0.12);
+}
+
+.active-timer-progress-indeterminate {
+  display: block;
+  width: 36%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(18, 210, 160, 0.2), rgba(18, 210, 160, 0.85));
+  animation: timerProgressPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes timerProgressPulse {
+  0% {
+    transform: translateX(-120%);
+  }
+
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+.active-timer-actions {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 0.05rem;
+}
+
+.active-timer-action {
+  min-width: 4rem;
+  min-height: 1.5rem;
+  padding: 0.28rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--accent-soft);
+  font: 600 0.68rem/1 "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease,
+    transform 140ms ease;
+}
+
+.active-timer-action:hover:not(:disabled) {
+  color: var(--accent-strong);
+  border-color: rgba(57, 255, 20, 0.28);
+  background: rgba(57, 255, 20, 0.08);
+  transform: translateY(-1px);
+}
+
+.active-timer-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.active-timers-grid--single-type {
+  width: 100%;
+}
+
+.active-timers-grid--single-type .active-timer-item:only-child {
+  margin-inline: auto;
 }
 
 .activity-status {
@@ -544,6 +844,7 @@ body[data-display-state="working"] .commands-reveal-zone {
   position: relative;
   overflow: visible;
   background: transparent;
+  gap: clamp(6px, 1vh, 12px);
 }
 
 .task-wait-timer {

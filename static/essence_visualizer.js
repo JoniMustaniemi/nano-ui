@@ -1,4 +1,4 @@
-/* global THREE */
+import * as THREE from "three";
 
 const ESSENCE_STATES = {
   standby: {
@@ -361,10 +361,6 @@ function smoothMotionParams(current, target, blend) {
 
 class EssenceVisualizer {
   constructor(canvas, options = {}) {
-    if (typeof THREE === "undefined") {
-      throw new Error("Three.js is required for the essence orb.");
-    }
-
     this.canvas = canvas;
     this.mini = Boolean(options.mini);
     this.state = "standby";
@@ -581,11 +577,6 @@ class EssenceVisualizer {
 }
 
 function initEssenceOrbs() {
-  if (typeof THREE === "undefined") {
-    console.error("Three.js failed to load. Essence orb unavailable.");
-    return;
-  }
-
   const canvas = document.getElementById("essence-canvas");
   if (!canvas) {
     return;

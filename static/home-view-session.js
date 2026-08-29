@@ -54,6 +54,9 @@ async function loadViewData(view) {
     return;
   }
   if (view === "commands") {
+    if (typeof initConnectionSettings === "function") {
+      initConnectionSettings();
+    }
     if (commandsList && !commandsList.querySelector(".command-button")) {
       await loadAndRenderToolCommands();
     }
