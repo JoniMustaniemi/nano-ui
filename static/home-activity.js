@@ -405,169 +405,7 @@ function syncTaskWaitTimer(taskTimer) {
   }, 1000);
 }
 
-function formatProgressAnnouncement(event) {
-  const title = (event.title || "").trim();
-  const detail = (event.detail || "").trim();
-  if (!title) {
-    return detail;
-  }
-  if (!detail || title.includes(detail)) {
-    return title;
-  }
-  return detail;
-}
-
-function formatImprovementPlanCompletedMessage(event) {
-  const detail = (event.detail || "").trim();
-  const themeMatch = detail.match(/^Theme:\s*(.+?)\.\s*Open the Plans tab/i);
-  if (themeMatch && themeMatch[1]) {
-    return `I finished a new improvement plan about ${themeMatch[1]}. Open the Plans tab to read it.`;
-  }
-  return "I finished a new improvement plan. Open the Plans tab to read it.";
-}
-
-function formatImplementationFailureFromState(event) {
-  const title = (event.title || "").trim();
-  const detail = (event.detail || "").trim();
-  if (detail && detail !== title && !title.includes(detail)) {
-    return detail;
-  }
-  return title;
-}
-
-function formatImplementationAnnouncement(event) {
-  const detail = (event.detail || "").trim();
-  if (detail) {
-    return detail;
-  }
-  const title = (event.title || "").trim();
-  return title;
-}
-
-let lastVoiceAnnouncement = "";
-let selfImprovementRunSettled = false;
-
-function normalizeVoiceAnnouncement(message) {
-  const skip = new Set(["the", "a"]);
-  const words = (message || "").trim().toLowerCase().replace(/\.$/, "").split(/\s+/).filter(Boolean);
-  return words.filter((word) => !skip.has(word)).join(" ");
-}
-
-function isImplementationTerminalMessage(message) {
-  const lowered = (message || "").toLowerCase();
-  return (
-    lowered.includes("implemented the improvement plan") ||
-    lowered.includes("declined to commit") ||
-    lowered.includes("tests failed") ||
-    lowered.includes("could not implement")
-  );
-}
-
-function releaseSelfImprovementWorkingMode({ headline, detail, state = "standby" } = {}) {
-  const nextState = activityStates.includes(state) ? state : "standby";
-  currentActivitySnapshot = {
-    ...currentActivitySnapshot,
-    state: nextState,
-    headline: headline || STANDBY_HEADLINE,
-    detail: detail ?? STANDBY_DETAIL_DEFAULT,
-    task_timer: null,
-  };
-  syncTaskWaitTimer(null);
-  suppressWorkingResponse = false;
-  selfImprovementRunSettled = true;
-  renderState();
-}
-
-function speakVoiceAnnouncement(message) {
-  const cleaned = (message || "").trim();
-  if (!cleaned || !voiceAvailable) {
-    return;
-  }
-  const normalized = normalizeVoiceAnnouncement(cleaned);
-  if (normalized === normalizeVoiceAnnouncement(lastVoiceAnnouncement)) {
-    return;
-  }
-  lastVoiceAnnouncement = cleaned;
-  if (getDisplayState() !== "working" && !requestInFlight) {
-    setAnswer(cleaned, { animate: false, deferClearUntilSpeech: true });
-  }
-  void playVoice(cleaned, { pauseRecognition: true, resumeListening: false });
-}
-
 function applyActivityEvent(event) {
-  if (
-    event.kind === "state" &&
-    event.state === "working" &&
-    (event.source === "tools.improvement_plan_service" ||
-      event.source === "tools.improvement_plan_implementation")
-  ) {
-    selfImprovementRunSettled = false;
-  }
-
-  if (
-    event.kind === "state" &&
-    event.source === "tools.improvement_plan_service.completed.silent"
-  ) {
-    releaseSelfImprovementWorkingMode({
-      headline: event.title,
-      detail: event.detail,
-    });
-    void loadPlans();
-    return;
-  }
-
-  if (
-    event.kind === "state" &&
-    event.source === "tools.improvement_plan_service.completed"
-  ) {
-    const message = formatImprovementPlanCompletedMessage(event);
-    setAnswer(message, { animate: false, deferClearUntilSpeech: voiceAvailable && !requestInFlight });
-    if (voiceAvailable && !requestInFlight) {
-      void playVoice(message, { resumeListening: false });
-    }
-    releaseSelfImprovementWorkingMode({
-      headline: event.title,
-      detail: event.detail,
-    });
-    void loadPlans();
-    return;
-  }
-
-  if (
-    event.kind === "log" &&
-    event.source === "runtime.voice.announce"
-  ) {
-    const message = formatImplementationAnnouncement(event);
-    if (message && !message.includes("http://") && !message.includes("https://")) {
-      if (message.toLowerCase().includes("implemented the improvement plan")) {
-        lastVoiceAnnouncement = "";
-      }
-      speakVoiceAnnouncement(message);
-      if (isImplementationTerminalMessage(message)) {
-        releaseSelfImprovementWorkingMode({
-          headline: message,
-          detail: message,
-        });
-      }
-    }
-    void loadPlans();
-    return;
-  }
-
-  if (
-    event.kind === "state" &&
-    event.source === "tools.improvement_plan_implementation" &&
-    (event.state === "standby" || event.state === "error")
-  ) {
-    releaseSelfImprovementWorkingMode({
-      headline: event.title || currentActivitySnapshot.headline,
-      detail: event.detail ?? currentActivitySnapshot.detail,
-      state: event.state,
-    });
-    void loadPlans();
-    return;
-  }
-
   if (event.kind === "log" && event.source === "runtime.task_timer") {
     void syncRuntimeTaskTimer();
     return;
@@ -582,9 +420,6 @@ function applyActivityEvent(event) {
   }
 
   if (event.kind === "log" && currentActivitySnapshot.state === "working") {
-    if (selfImprovementRunSettled && !requestInFlight) {
-      return;
-    }
     const progressLine = (event.title || "").trim();
     if (progressLine) {
       const nextState =
@@ -604,31 +439,6 @@ function applyActivityEvent(event) {
     return;
   }
 
-  if (
-    event.source === "tools.pr_service" &&
-    event.state === "working"
-  ) {
-    selfImprovementRunSettled = false;
-  }
-
-  if (
-    event.source === "tools.pr_service" &&
-    (event.state === "standby" || event.state === "error")
-  ) {
-    syncTaskWaitTimer(null);
-    suppressWorkingResponse = false;
-    selfImprovementRunSettled = true;
-  }
-
-  if (
-    selfImprovementRunSettled &&
-    event.state === "working" &&
-    (event.source === "tools.pr_service" ||
-      event.source === "tools.improvement_plan_implementation" ||
-      event.source === "runtime.long_task_progress")
-  ) {
-    return;
-  }
   const nextState = activityStates.includes(event.state) ? event.state : "standby";
   const useServerCopy = nextState === "standby" || nextState === "error";
   const nextHeadline = useServerCopy
@@ -812,7 +622,6 @@ async function bootstrap() {
     await connectMicrophoneOnStartup();
     const bootEvent = findLatestBootEvent(snapshot);
     void refreshStandbyGreeting({ speakOnce: true, bootEvent });
-    await loadPlans();
     const lastEventId = Array.isArray(snapshot.events)
       ? snapshot.events.reduce((maxId, event) => {
           const eventId = Number(event?.id || 0);
@@ -853,7 +662,6 @@ function listen(lastEventId = 0) {
     applyActivityEvent(payload);
     appendEvent(payload);
     refreshStorage();
-    void loadPlans();
   });
   source.onerror = () => {
     if (reconnectInProgress) {

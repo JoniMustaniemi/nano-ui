@@ -1,6 +1,5 @@
 const VIEW_TITLES = {
   brains: "Brains",
-  plans: "Plans",
   storage: "Stored data",
   commands: "Commands",
   calendar: "Calendar",
@@ -8,7 +7,6 @@ const VIEW_TITLES = {
 
 const VIEW_OPEN_ACK = {
   brains: "Opening Brains.",
-  plans: "Opening Plans.",
   storage: "Opening stored data.",
   commands: "Opening commands.",
   calendar: "Opening Calendar.",
@@ -16,7 +14,6 @@ const VIEW_OPEN_ACK = {
 
 const VIEW_PANELS = {
   brains: () => viewPanelBrains,
-  plans: () => viewPanelPlans,
   storage: () => viewPanelStorage,
   commands: () => viewPanelCommands,
   calendar: () => viewPanelCalendar,
@@ -52,11 +49,6 @@ function showViewPanel(view) {
 }
 
 async function loadViewData(view) {
-  if (view === "plans") {
-    closePlanReader();
-    await loadPlans();
-    return;
-  }
   if (view === "storage") {
     await refreshStorage();
     return;
@@ -110,9 +102,6 @@ function setViewModalExpanded(expanded) {
 function prepareViewSwitch(fromView) {
   if (fromView === "commands") {
     closeCommandDropdowns();
-  }
-  if (fromView === "plans" && typeof closePlanReader === "function") {
-    closePlanReader();
   }
   if (fromView === "calendar") {
     if (typeof closeCalendarDayPanel === "function") {

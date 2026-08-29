@@ -6,7 +6,6 @@ INDEX_PATH = ROOT_DIR / "index.html"
 
 HOME_JS_MODULES = (
     "home-state.js",
-    "home-plans.js",
     "home-calendar.js",
     "home-view-session.js",
     "home-ui.js",
@@ -119,3 +118,16 @@ def test_reboot_restart_reconnect_helpers() -> None:
     assert "pendingSystemCommandId" in js_text
     assert "reboot_confirmation" not in voice_js
     assert "restart_confirmation" not in voice_js
+
+
+def test_improvement_plans_removed() -> None:
+    js_text = _load_home_js()
+    html_text = _load_index_html()
+    css_text = _load_home_css()
+
+    assert not (STATIC_DIR / "home-plans.js").exists()
+    assert "home-plans.js" not in (STATIC_DIR / "home-entry.js").read_text(encoding="utf-8")
+    assert "improvement-plans" not in js_text
+    assert "loadPlans" not in js_text
+    assert "nano-panel-plans" not in html_text
+    assert ".plan-card" not in css_text

@@ -26,7 +26,6 @@ const LAST_COMMAND_CATEGORIES = ["System", "Git", "GitHub"];
 
 const VIEW_CLIENT_ACTIONS = {
   open_brains: "brains",
-  open_plans: "plans",
   open_storage: "storage",
   open_commands: "commands",
   open_calendar: "calendar",
@@ -270,22 +269,6 @@ function matchesSectionPatterns(normalized, patterns) {
   return patterns.some((pattern) => pattern.test(normalized));
 }
 
-const PLANS_SECTION_PATTERNS = [
-  /^(open|show|go to)(\s+the)?\s+plans(\s+(tab|section|panel|view))?$/,
-  /^(open|show|go to)(\s+the)?\s+improvement plans$/,
-  /^(what|show|tell|list)(\s+are)?(\s+my)?\s+(improvement plans|plans)$/,
-  /\bwhat\s+have\s+you\s+planned\b/,
-  /\bwhat\s+do\s+you\s+have\s+planned\b/,
-  /\bwhat\s+plans\s+do\s+you\s+have\b/,
-  /\bwhat\s+(plans|improvement plans)\b/,
-  /\b(your|any|the)\s+(plans|improvement plans)\b/,
-  /\b(show|see|view|open|look at|display|pull up|bring up)\b.*\b(plans|improvement plans)\b/,
-  /\b(can|could|may|would|let)\s+(i|me|we)\s+(see|view|look at|open|show|have)\b.*\b(plans|improvement plans)\b/,
-  /\bwhat\s+(is|are)\s+in\s+(the\s+)?plans\b/,
-  /\btake\s+me\s+to\s+(the\s+)?plans(\s+(tab|section|panel|view))?\b/,
-  /\bgo\s+to\s+(the\s+)?plans\s+tab\b/,
-];
-
 const BRAINS_SECTION_PATTERNS = [
   /^(open|show|go to)(\s+the)?\s+brains(\s+(tab|section|panel|view))?$/,
   /^(open|show)(\s+the)?\s+internal notes$/,
@@ -357,7 +340,7 @@ const CLOSE_PATTERNS = [
   /^close it$/,
   /^exit panel$/,
   /^close(\s+the)?\s+(panel|sheet|drawer|view|modal)$/,
-  /^close(\s+the)?\s+(plans|brains|storage|commands|calendar)(\s+(tab|panel|drawer|section))?$/,
+  /^close(\s+the)?\s+(brains|storage|commands|calendar)(\s+(tab|panel|drawer|section))?$/,
   /^dismiss(\s+the)?\s+(panel|sheet|drawer|view|modal)$/,
   /^hide(\s+the)?\s+(panel|view|this|modal)$/,
   /\b(you can|can you|could you|please)\s+close\b/,
@@ -365,7 +348,7 @@ const CLOSE_PATTERNS = [
   /\b(thanks|thank you)\b.*\b(close|dismiss)\b/,
   /\b(close|dismiss|hide)\b.*\b(menu|panel|view|modal|this|it|screen|window)\b/,
   /\b(menu|panel|view|modal|this|it|screen)\b.*\b(close|dismiss|hide)\b/,
-  /\b(close|dismiss|hide)\b.*\b(plans|brains|storage|commands|calendar)\b/,
+  /\b(close|dismiss|hide)\b.*\b(brains|storage|commands|calendar)\b/,
 ];
 
 function isCloseCommandNegated(normalized) {
@@ -402,9 +385,6 @@ function matchUiCommand(message) {
   if (matchesCloseCommand(message)) {
     return { type: "close" };
   }
-  if (matchesSectionPatterns(normalized, PLANS_SECTION_PATTERNS)) {
-    return { type: "section", target: "plans" };
-  }
   if (matchesSectionPatterns(normalized, BRAINS_SECTION_PATTERNS)) {
     return { type: "section", target: "brains" };
   }
@@ -428,10 +408,6 @@ function revealControlsForUiCommand() {
 
 function closeOpenUiPanels() {
   let closed = false;
-  if (typeof isPlanReaderOpen === "function" && isPlanReaderOpen()) {
-    closePlanReader();
-    closed = true;
-  }
   if (keyboardOpen) {
     closeKeyboardPanel();
     closed = true;
@@ -471,11 +447,7 @@ function tryHandleUiCommand(message, source = "ui") {
 
   if (command.type === "close") {
     if (isViewSessionActive()) {
-      if (typeof isPlanReaderOpen === "function" && isPlanReaderOpen()) {
-        closePlanReader();
-      } else {
-        closeViewSession({ reason: source === "voice" ? "voice" : "ui" });
-      }
+      closeViewSession({ reason: source === "voice" ? "voice" : "ui" });
     } else {
       closeOpenUiPanels();
     }
@@ -508,7 +480,6 @@ function uiCommandStatusMessage(command) {
   if (command.type === "section") {
     const labels = {
       brains: "Opening Brains.",
-      plans: "Opening Plans.",
       storage: "Opening stored data.",
       commands: "Opening commands.",
       calendar: "Opening Calendar.",

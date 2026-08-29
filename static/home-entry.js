@@ -2,7 +2,6 @@ const HOME_SCRIPT_ORDER = [
   "nano-api.js",
   "nano-settings.js",
   "home-state.js",
-  "home-plans.js",
   "home-calendar.js",
   "home-ui.js",
   "home-view-session.js",
