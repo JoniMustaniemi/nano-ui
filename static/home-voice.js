@@ -397,12 +397,18 @@ function waitForVoicePlayback() {
   });
 }
 
+function answerNeedsYesNoConfirmation(text) {
+  const lowered = text.toLowerCase();
+  return lowered.includes("yes") && lowered.includes("no");
+}
+
 function answerNeedsVoiceFollowUp(text) {
   const lowered = text.toLowerCase();
   return (
     lowered.includes("how long should the timer run") ||
     lowered.includes("didn't catch a duration") ||
-    lowered.includes("reply yes to proceed or no to cancel")
+    lowered.includes("reply yes to proceed or no to cancel") ||
+    answerNeedsYesNoConfirmation(text)
   );
 }
 

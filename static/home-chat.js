@@ -61,6 +61,9 @@ async function submitMessage(message, source, commandHint) {
   if (isViewSessionActive()) {
     return;
   }
+  if (isSystemCommandId(commandHint?.id)) {
+    setPendingSystemCommand(commandHint.id);
+  }
   showUserSpeech(message);
   requestInFlight = true;
   await acknowledgeRequest(source, commandHint);
@@ -94,10 +97,29 @@ async function submitMessage(message, source, commandHint) {
     returnToWakeDetection();
   } finally {
     requestInFlight = false;
-    await syncRuntimeStatus();
+    if (!reconnectInProgress) {
+      await syncRuntimeStatus();
+    }
   }
 
   if (requestFailed || !answerText) {
+    return;
+  }
+
+  const systemResponse = handleSystemCommandResponse(answerText);
+  if (systemResponse.handled) {
+    if (systemResponse.reconnect) {
+      returnToWakeDetection();
+      if (shouldSpeak) {
+        await playVoice(answerText);
+      }
+      void beginNanoReconnect(systemResponse.kind);
+      return;
+    }
+    if (shouldSpeak) {
+      await playVoice(answerText);
+    }
+    returnToWakeDetection();
     return;
   }
 
@@ -116,9 +138,19 @@ async function submitMessage(message, source, commandHint) {
 
   const needsVoiceFollowUp = answerNeedsVoiceFollowUp(answerText);
   if (needsVoiceFollowUp) {
+    if (!pendingSystemCommandId) {
+      const inferredCommandId =
+        inferSystemCommandFromMessage(message) || inferSystemCommandFromText(answerText);
+      if (inferredCommandId) {
+        setPendingSystemCommand(inferredCommandId);
+      }
+    }
+    const followUpPrompt = pendingSystemCommandId
+      ? "Reply yes to confirm or no to cancel."
+      : "Hold the mic button and speak your answer.";
     setVoiceStatus("Hold the mic button after I finish speaking.");
     await playVoice(answerText);
-    armVoiceFollowUp("Hold the mic button and speak your answer.");
+    armVoiceFollowUp(followUpPrompt);
     return;
   }
 

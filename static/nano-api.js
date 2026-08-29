@@ -79,6 +79,24 @@ function nanoEventSource(path) {
   return new EventSource(`${buildApiUrl(path)}${authSuffix}`);
 }
 
+async function waitForNano({ timeoutMs = 120_000, intervalMs = 2_000 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const response = await nanoFetch("/api/health");
+      if (response.ok) {
+        return true;
+      }
+    } catch (_error) {
+      // Keep polling until timeout.
+    }
+    await new Promise((resolve) => {
+      setTimeout(resolve, intervalMs);
+    });
+  }
+  return false;
+}
+
 window.getApiBase = getApiBase;
 window.getApiKey = getApiKey;
 window.setApiConnection = setApiConnection;
@@ -86,3 +104,4 @@ window.hasApiConnection = hasApiConnection;
 window.buildApiUrl = buildApiUrl;
 window.nanoFetch = nanoFetch;
 window.nanoEventSource = nanoEventSource;
+window.waitForNano = waitForNano;

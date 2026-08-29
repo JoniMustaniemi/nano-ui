@@ -12,6 +12,7 @@ HOME_JS_MODULES = (
     "home-ui.js",
     "home-voice.js",
     "home-activity.js",
+    "home-reconnect.js",
     "home-chat.js",
     "home-bootstrap.js",
 )
@@ -97,3 +98,24 @@ def test_bootstrap_waits_for_api_connection() -> None:
 
     assert "ensureApiConnection" in bootstrap_js
     assert "bootstrap()" in bootstrap_js
+
+
+def test_reboot_restart_reconnect_helpers() -> None:
+    js_text = _load_home_js()
+    reconnect_js = (STATIC_DIR / "home-reconnect.js").read_text(encoding="utf-8")
+    api_js = (STATIC_DIR / "nano-api.js").read_text(encoding="utf-8")
+    voice_js = (STATIC_DIR / "home-voice.js").read_text(encoding="utf-8")
+    entry_js = (STATIC_DIR / "home-entry.js").read_text(encoding="utf-8")
+
+    assert "waitForNano" in api_js
+    assert "nano-reconnect-overlay" in reconnect_js
+    assert "beginNanoReconnect" in reconnect_js
+    assert "reboot_pi" in reconnect_js
+    assert "restart_nano" in reconnect_js
+    assert "answerNeedsYesNoConfirmation" in voice_js
+    assert "handleSystemCommandResponse" in reconnect_js
+    assert "home-reconnect.js" in entry_js
+    assert "reconnectInProgress" in js_text
+    assert "pendingSystemCommandId" in js_text
+    assert "reboot_confirmation" not in voice_js
+    assert "restart_confirmation" not in voice_js

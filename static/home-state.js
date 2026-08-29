@@ -135,6 +135,8 @@ let currentStandbyGreeting = "";
 
 let mainEssence = null;
 let toolCommands = [];
+let pendingSystemCommandId = null;
+let reconnectInProgress = false;
 const activityStates = ["standby", "working", "error"];
 let STANDBY_HEADLINE = "I'm in standby.";
 let STANDBY_DETAIL_DEFAULT = "Awaiting your input.";

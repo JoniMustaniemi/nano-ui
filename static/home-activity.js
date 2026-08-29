@@ -834,8 +834,20 @@ async function refreshStorage() {
   }
 }
 
+let activityEventSource = null;
+
+function closeActivityEventSource() {
+  if (!activityEventSource) {
+    return;
+  }
+  activityEventSource.close();
+  activityEventSource = null;
+}
+
 function listen(lastEventId = 0) {
+  closeActivityEventSource();
   const source = nanoEventSource(`/api/events?since=${lastEventId}`);
+  activityEventSource = source;
   source.addEventListener("activity", (event) => {
     const payload = JSON.parse(event.data);
     applyActivityEvent(payload);
@@ -844,6 +856,9 @@ function listen(lastEventId = 0) {
     void loadPlans();
   });
   source.onerror = () => {
+    if (reconnectInProgress) {
+      return;
+    }
     stateLine.textContent = "reconnecting";
     updateEssenceState();
   };

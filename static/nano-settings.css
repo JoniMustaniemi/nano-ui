@@ -68,6 +68,61 @@
   color: #9fd0ff;
 }
 
+.nano-reconnect-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.78);
+  padding: 1rem;
+}
+
+.nano-reconnect-overlay[hidden] {
+  display: none;
+}
+
+.nano-reconnect-panel {
+  width: min(28rem, 100%);
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  border-radius: 1rem;
+  background: #111;
+  color: #f5f5f5;
+  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.35);
+}
+
+.nano-reconnect-panel h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.nano-reconnect-panel p {
+  margin: 0;
+  color: #c8c8c8;
+}
+
+.nano-reconnect-status {
+  min-height: 1.25rem;
+  font-size: 0.9rem;
+  color: #9fd0ff;
+}
+
+.nano-reconnect-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.nano-reconnect-actions button {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.55rem 1rem;
+  background: #2f6fed;
+  color: #fff;
+  cursor: pointer;
+}
+
 .voice-push-toggle.recording {
   color: #ff6b6b;
 }

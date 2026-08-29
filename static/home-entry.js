@@ -8,6 +8,7 @@ const HOME_SCRIPT_ORDER = [
   "home-view-session.js",
   "home-voice.js",
   "home-activity.js",
+  "home-reconnect.js",
   "home-chat.js",
   "home-bootstrap.js",
 ];

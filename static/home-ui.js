@@ -191,7 +191,7 @@ function shouldShowControlsRevealZones() {
 }
 
 function updateInputLock() {
-  const locked = getDisplayState() === "working";
+  const locked = getDisplayState() === "working" || reconnectInProgress;
   messageBox.disabled = locked;
   sendButton.disabled = locked;
   commandsToggle.disabled = locked;
