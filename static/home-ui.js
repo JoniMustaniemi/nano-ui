@@ -22,7 +22,10 @@ function isWorkingOnTask() {
   return requestInFlight || currentActivitySnapshot.state === "working";
 }
 
-const LAST_COMMAND_CATEGORIES = ["System", "Git", "GitHub"];
+const LAST_COMMAND_CATEGORIES = ["System"];
+const EXCLUDED_COMMAND_CATEGORIES = new Set(["git", "github"]);
+const GIT_PR_COMMAND_PATTERN =
+  /\b(commit|pull request|pull_request|create pr|gh pr|git push|git commit)\b/i;
 const YES_NO_PENDING_KINDS = new Set(["wipe_confirmation", "presence_check"]);
 
 const VIEW_CLIENT_ACTIONS = {
@@ -243,12 +246,29 @@ function closeCommandDropdowns() {
   }
 }
 
+function isExcludedToolCommand(command) {
+  const category = String(command?.category || "").trim().toLowerCase();
+  if (EXCLUDED_COMMAND_CATEGORIES.has(category)) {
+    return true;
+  }
+  const searchable = `${command?.id || ""} ${command?.message || ""} ${command?.label || ""}`;
+  return GIT_PR_COMMAND_PATTERN.test(searchable);
+}
+
+function filterToolCommands(commands) {
+  if (!Array.isArray(commands)) {
+    return [];
+  }
+  return commands.filter((command) => !isExcludedToolCommand(command));
+}
+
 async function loadToolCommands() {
   const response = await nanoFetch("/api/tool-commands");
   if (!response.ok) {
     throw new Error("Could not load tool commands.");
   }
-  return response.json();
+  const commands = await response.json();
+  return filterToolCommands(commands);
 }
 
 async function runToolCommand(command) {
@@ -737,13 +757,7 @@ function isTransientActivityCopy(headline, detail) {
     return false;
   }
   return (
-    lowered.includes("lint check") ||
-    lowered.includes("type check") ||
-    lowered.includes("verification failed") ||
-    lowered.includes("could not complete") ||
-    lowered.includes("could not implement") ||
-    lowered.includes("declined to commit") ||
-    lowered.includes("tests failed")
+    lowered.includes("could not complete")
   );
 }
 

@@ -121,6 +121,7 @@ let speakingActive = false;
 let controlsHidden = true;
 let waitingForPresence = false;
 let waitingForFollowUp = false;
+let suppressPendingRearm = false;
 let lastHandledDismissal = null;
 let currentStandbyGreeting = "";
 

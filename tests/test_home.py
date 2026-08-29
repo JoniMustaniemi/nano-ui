@@ -138,3 +138,30 @@ def test_improvement_plans_removed() -> None:
     assert "loadPlans" not in js_text
     assert "nano-panel-plans" not in html_text
     assert ".plan-card" not in css_text
+
+
+def test_confirmation_answer_clears_waiting_state() -> None:
+    chat_js = (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
+    voice_js = (STATIC_DIR / "home-voice.js").read_text(encoding="utf-8")
+    activity_js = (STATIC_DIR / "home-activity.js").read_text(encoding="utf-8")
+
+    assert 'confirmationAnswer: true' in chat_js
+    assert "isConfirmationAnswer" in chat_js
+    assert "suppressPendingRearm" in chat_js
+    assert "resetStandbySnapshot()" in chat_js
+    assert "returnToWakeDetection()" in chat_js
+    assert "renderState();" in voice_js.split("function returnToWakeDetection()")[1]
+    assert "suppressPendingRearm" in activity_js
+
+
+def test_git_pr_ui_removed() -> None:
+    ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+
+    assert 'LAST_COMMAND_CATEGORIES = ["System"]' in ui_js
+    assert '"Git"' not in ui_js
+    assert '"GitHub"' not in ui_js
+    assert "filterToolCommands" in ui_js
+    assert "isExcludedToolCommand" in ui_js
+    assert "declined to commit" not in ui_js
+    assert "lint check" not in ui_js
+    assert "tests failed" not in ui_js

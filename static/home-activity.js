@@ -155,6 +155,13 @@ async function refreshStandbyGreeting(options = {}) {
 }
 
 function applyPendingSnapshot(pending, proactive) {
+  if (suppressPendingRearm) {
+    currentAnswerPendingKind = null;
+    clearAnswerTimeoutTimer();
+    answerTimeoutPending = false;
+    syncConfirmationActions();
+    return;
+  }
   if (!pending || typeof pending !== "object") {
     currentAnswerPendingKind = null;
     if (!waitingForPresence) {

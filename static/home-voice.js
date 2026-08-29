@@ -502,6 +502,7 @@ function returnToWakeDetection() {
   syncConfirmationActions();
   setVoiceStatus("Hold the mic button to talk. Processing happens on the Pi.");
   syncVoiceListeningState();
+  renderState();
 }
 
 function startVoiceListening() {

@@ -58,14 +58,29 @@ async function submitConfirmationAnswer(answer) {
   if (!confirmationActions || confirmationActions.hidden) {
     return;
   }
-  await submitMessage(answer, "text");
+  await submitMessage(answer, "text", { confirmationAnswer: true });
 }
 
 async function submitMessage(message, source, commandHint) {
+  const confirmationAnswer = Boolean(commandHint?.confirmationAnswer);
+  const typedConfirmationAnswer =
+    !confirmationAnswer &&
+    (message === "yes" || message === "no") &&
+    confirmationActions &&
+    !confirmationActions.hidden;
+  const isConfirmationAnswer = confirmationAnswer || typedConfirmationAnswer;
+
+  if (isConfirmationAnswer) {
+    suppressPendingRearm = true;
+  }
+
   clearAnswerTimeoutTimer();
   answerTimeoutPending = false;
   waitingForYesNoConfirmation = false;
   syncConfirmationActions();
+  if (isConfirmationAnswer) {
+    returnToWakeDetection();
+  }
   if (tryHandleUiCommand(message, source)) {
     await completeUiCommand(source);
     return;
@@ -107,10 +122,16 @@ async function submitMessage(message, source, commandHint) {
     requestFailed = true;
     replyStatus.textContent = error.message;
     returnToWakeDetection();
+    if (isConfirmationAnswer) {
+      suppressPendingRearm = false;
+    }
   } finally {
     requestInFlight = false;
     if (!reconnectInProgress) {
       await syncRuntimeStatus();
+      if (isConfirmationAnswer) {
+        returnToWakeDetection();
+      }
     }
   }
 
@@ -132,6 +153,15 @@ async function submitMessage(message, source, commandHint) {
       await playVoice(answerText);
     }
     returnToWakeDetection();
+    return;
+  }
+
+  if (isConfirmationAnswer) {
+    resetStandbySnapshot();
+    if (shouldSpeak) {
+      await playVoice(answerText);
+    }
+    suppressPendingRearm = false;
     return;
   }
 
