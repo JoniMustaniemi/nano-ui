@@ -156,26 +156,32 @@ async function refreshStandbyGreeting(options = {}) {
 
 function applyPendingSnapshot(pending, proactive) {
   if (!pending || typeof pending !== "object") {
+    currentAnswerPendingKind = null;
     if (!waitingForPresence) {
       waitingForFollowUp = false;
     }
     clearAnswerTimeoutTimer();
     answerTimeoutPending = false;
+    syncConfirmationActions();
     return;
   }
   const kind = pending.kind;
   if (!kind) {
+    currentAnswerPendingKind = null;
     if (!waitingForPresence) {
       waitingForFollowUp = false;
     }
     clearAnswerTimeoutTimer();
     answerTimeoutPending = false;
+    syncConfirmationActions();
     return;
   }
   if (kind === "presence_check") {
     return;
   }
+  currentAnswerPendingKind = kind;
   ensureDirectAnswerListening(pendingListenStatus(kind));
+  setYesNoConfirmationActive(YES_NO_PENDING_KINDS.has(kind));
 }
 
 function applyStatusSnapshot(snapshot) {
@@ -629,6 +635,9 @@ async function bootstrap() {
         }, 0)
       : 0;
     listen(lastEventId);
+    if (typeof loadNanoVersionFromBackend === "function") {
+      await loadNanoVersionFromBackend();
+    }
   } catch (error) {
     replyStatus.textContent = error.message;
   }

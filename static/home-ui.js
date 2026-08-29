@@ -23,6 +23,7 @@ function isWorkingOnTask() {
 }
 
 const LAST_COMMAND_CATEGORIES = ["System", "Git", "GitHub"];
+const YES_NO_PENDING_KINDS = new Set(["wipe_confirmation", "presence_check"]);
 
 const VIEW_CLIENT_ACTIONS = {
   open_brains: "brains",
@@ -152,6 +153,29 @@ async function loadAndRenderToolCommands() {
   }
 }
 
+function setYesNoConfirmationActive(active) {
+  waitingForYesNoConfirmation = active;
+  syncConfirmationActions();
+}
+
+function syncConfirmationActions() {
+  if (!confirmationActions) {
+    return;
+  }
+  const show =
+    waitingForYesNoConfirmation ||
+    waitingForPresence ||
+    (currentAnswerPendingKind && YES_NO_PENDING_KINDS.has(currentAnswerPendingKind));
+  confirmationActions.hidden = !show;
+  const disabled = requestInFlight || reconnectInProgress || getDisplayState() === "working";
+  if (confirmationYesButton) {
+    confirmationYesButton.disabled = disabled;
+  }
+  if (confirmationNoButton) {
+    confirmationNoButton.disabled = disabled;
+  }
+}
+
 function setCommandButtonsDisabled(disabled) {
   for (const button of commandsList.querySelectorAll(".command-button")) {
     button.disabled = disabled;
@@ -200,6 +224,7 @@ function updateInputLock() {
   nanoControlsToggle.disabled = locked;
   keyboardToggle.disabled = locked;
   setCommandButtonsDisabled(locked);
+  syncConfirmationActions();
   document.body.classList.toggle("inputs-locked", locked);
 }
 
@@ -956,11 +981,14 @@ function renderState() {
   }
   updateEssenceState();
   updateInputLock();
+  syncConfirmationActions();
 }
 
 function resetVoiceListeningMode() {
   waitingForVoiceAnswer = false;
   waitingForFollowUp = false;
+  waitingForYesNoConfirmation = false;
+  currentAnswerPendingKind = null;
 }
 
 function openKeyboardPanel() {

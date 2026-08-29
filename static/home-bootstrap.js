@@ -1,4 +1,14 @@
 sendButton.addEventListener("click", sendMessage);
+if (confirmationYesButton) {
+  confirmationYesButton.addEventListener("click", () => {
+    void submitConfirmationAnswer("yes");
+  });
+}
+if (confirmationNoButton) {
+  confirmationNoButton.addEventListener("click", () => {
+    void submitConfirmationAnswer("no");
+  });
+}
 commandsToggle.addEventListener("click", () => {
   if (getDisplayState() === "working") {
     return;
@@ -91,6 +101,28 @@ window.addEventListener("beforeunload", () => {
   }
 });
 
+const nanoVersion = document.getElementById("nano-version");
+
+async function loadNanoVersionFromBackend() {
+  if (!nanoVersion) {
+    return;
+  }
+  try {
+    const response = await nanoFetch("/api/health");
+    if (!response.ok) {
+      nanoVersion.textContent = "";
+      return;
+    }
+    const data = await response.json();
+    const version = String(data?.version || "").trim();
+    nanoVersion.textContent = version ? `v${version}` : "";
+  } catch {
+    nanoVersion.textContent = "";
+  }
+}
+
+window.loadNanoVersionFromBackend = loadNanoVersionFromBackend;
+
 window.addEventListener("load", () => {
   requestAnimationFrame(async () => {
     initEssence();
@@ -99,6 +131,7 @@ window.addEventListener("load", () => {
     if (!connected) {
       return;
     }
+    await loadNanoVersionFromBackend();
     void initVoiceVolumeControl();
     restoreBaseAnswer();
     setVoiceStatus("Voice on standby.");

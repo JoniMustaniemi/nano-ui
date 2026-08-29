@@ -44,6 +44,20 @@ body.keyboard-open {
   overflow: hidden;
 }
 
+.nano-version {
+  position: fixed;
+  left: 50%;
+  bottom: max(14px, calc(env(safe-area-inset-bottom, 0) + 10px));
+  z-index: 35;
+  margin: 0;
+  transform: translateX(-50%);
+  color: rgba(107, 143, 114, 0.32);
+  font: 500 0.68rem/1 "Cascadia Mono", Consolas, monospace;
+  letter-spacing: 0.05em;
+  pointer-events: none;
+  user-select: none;
+}
+
 body.view-modal-open .essence-zone {
   opacity: 0.35;
   filter: blur(1px);
@@ -260,11 +274,61 @@ body[data-display-state="working"] .commands-reveal-zone {
 }
 
 .response-headline.empty {
+  opacity: 0;
+  visibility: hidden;
   color: var(--text);
   background-image: linear-gradient(135deg, var(--text) 0%, var(--accent-soft) 80%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+.confirmation-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 0 8px;
+}
+
+.confirmation-actions[hidden] {
+  display: none !important;
+}
+
+.confirmation-btn {
+  min-width: 88px;
+  min-height: 40px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(57, 255, 20, 0.22);
+  background: rgba(0, 0, 0, 0.42);
+  color: var(--accent-soft);
+  font: 600 0.82rem/1 "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    background 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+
+.confirmation-btn:hover:not(:disabled) {
+  color: var(--accent-strong);
+  border-color: rgba(57, 255, 20, 0.38);
+  background: rgba(57, 255, 20, 0.08);
+  transform: translateY(-1px);
+}
+
+.confirmation-btn-yes:not(:disabled) {
+  border-color: rgba(57, 255, 20, 0.34);
+  background: rgba(57, 255, 20, 0.1);
+  color: var(--accent-strong);
+}
+
+.confirmation-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .response-headline.working {

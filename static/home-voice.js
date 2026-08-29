@@ -447,6 +447,7 @@ async function enterPresenceListenMode(prompt) {
   const text = (prompt || "Are you there?").trim();
   waitingForFollowUp = false;
   waitingForPresence = true;
+  setYesNoConfirmationActive(true);
   setAnswer(text, { animate: false, deferClearUntilSpeech: Boolean(voiceAvailable && text) });
   renderState();
   try {
@@ -485,7 +486,10 @@ async function handlePresenceDismissal(message) {
   returnToWakeDetection();
 }
 
-function armVoiceFollowUp(text) {
+function armVoiceFollowUp(text, { yesNo = false } = {}) {
+  if (yesNo) {
+    setYesNoConfirmationActive(true);
+  }
   ensureDirectAnswerListening(text || "Hold the mic button and speak your answer.");
 }
 
@@ -493,6 +497,9 @@ function returnToWakeDetection() {
   waitingForVoiceAnswer = false;
   waitingForFollowUp = false;
   waitingForPresence = false;
+  waitingForYesNoConfirmation = false;
+  currentAnswerPendingKind = null;
+  syncConfirmationActions();
   setVoiceStatus("Hold the mic button to talk. Processing happens on the Pi.");
   syncVoiceListeningState();
 }

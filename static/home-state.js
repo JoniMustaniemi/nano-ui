@@ -10,6 +10,9 @@ const replyStatus = document.getElementById("reply-status");
 const messageBox = document.getElementById("message");
 const sendButton = document.getElementById("send");
 const answerOutput = document.getElementById("answer-output");
+const confirmationActions = document.getElementById("confirmation-actions");
+const confirmationYesButton = document.getElementById("confirmation-yes");
+const confirmationNoButton = document.getElementById("confirmation-no");
 const voiceAudio = document.getElementById("voice-audio");
 const storageLog = document.getElementById("storage-log");
 const commandsToggle = document.getElementById("commands-toggle");
@@ -71,6 +74,8 @@ let microphoneStream = null;
 let microphoneReady = false;
 let requestInFlight = false;
 let waitingForVoiceAnswer = false;
+let waitingForYesNoConfirmation = false;
+let currentAnswerPendingKind = null;
 let currentActivitySnapshot = {
   state: "standby",
   headline: "I'm in standby.",

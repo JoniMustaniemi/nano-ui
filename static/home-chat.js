@@ -51,9 +51,21 @@ async function submitDefaultNoAnswer() {
   await submitMessage(DEFAULT_NO_ANSWER, "voice");
 }
 
+async function submitConfirmationAnswer(answer) {
+  if (requestInFlight || reconnectInProgress) {
+    return;
+  }
+  if (!confirmationActions || confirmationActions.hidden) {
+    return;
+  }
+  await submitMessage(answer, "text");
+}
+
 async function submitMessage(message, source, commandHint) {
   clearAnswerTimeoutTimer();
   answerTimeoutPending = false;
+  waitingForYesNoConfirmation = false;
+  syncConfirmationActions();
   if (tryHandleUiCommand(message, source)) {
     await completeUiCommand(source);
     return;
@@ -145,12 +157,16 @@ async function submitMessage(message, source, commandHint) {
         setPendingSystemCommand(inferredCommandId);
       }
     }
-    const followUpPrompt = pendingSystemCommandId
+    const isYesNoConfirmation =
+      answerNeedsYesNoConfirmation(answerText) ||
+      answerText.toLowerCase().includes("reply yes to proceed or no to cancel") ||
+      Boolean(pendingSystemCommandId);
+    const followUpPrompt = isYesNoConfirmation
       ? "Reply yes to confirm or no to cancel."
       : "Hold the mic button and speak your answer.";
     setVoiceStatus("Hold the mic button after I finish speaking.");
     await playVoice(answerText);
-    armVoiceFollowUp(followUpPrompt);
+    armVoiceFollowUp(followUpPrompt, { yesNo: isYesNoConfirmation });
     return;
   }
 

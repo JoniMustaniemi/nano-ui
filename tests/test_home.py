@@ -47,6 +47,10 @@ def test_homepage_shows_standby_ui() -> None:
     essence_index = response_text.index('class="essence-zone"')
     assert answer_index < user_speech_index < active_timers_index < essence_index
     assert 'id="voice-push-toggle"' in response_text
+    assert 'id="confirmation-actions"' in response_text
+    assert 'id="confirmation-yes"' in response_text
+    assert 'id="confirmation-no"' in response_text
+    assert 'class="nano-version"' in response_text
 
 
 def test_favicon_asset_exists() -> None:
@@ -96,7 +100,10 @@ def test_bootstrap_waits_for_api_connection() -> None:
     bootstrap_js = (STATIC_DIR / "home-bootstrap.js").read_text(encoding="utf-8")
 
     assert "ensureApiConnection" in bootstrap_js
-    assert "bootstrap()" in bootstrap_js
+    assert "submitConfirmationAnswer" in (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
+    assert "syncConfirmationActions" in (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+    assert "loadNanoVersionFromBackend" in bootstrap_js
+    assert 'nanoFetch("/api/health")' in bootstrap_js
 
 
 def test_reboot_restart_reconnect_helpers() -> None:
