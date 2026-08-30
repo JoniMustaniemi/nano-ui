@@ -19,6 +19,7 @@ const voiceVolumeInput = document.getElementById("voice-volume");
 const voiceVolumeValue = document.getElementById("voice-volume-value");
 const voiceModeOffBtn = document.getElementById("voice-mode-off");
 const voiceModeOnBtn = document.getElementById("voice-mode-on");
+const voiceSupportNotice = document.getElementById("voice-support-notice");
 const cpuTempChip = document.getElementById("cpu-temp-chip");
 const weatherChip = document.getElementById("weather-chip");
 const clockChip = document.getElementById("clock-chip");

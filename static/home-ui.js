@@ -295,7 +295,11 @@ function updateInputLock() {
     keyboardToggle.disabled = locked;
   }
   if (voiceModeOnBtn) {
-    voiceModeOnBtn.disabled = locked;
+    const voiceSupported =
+      typeof isVoiceRecognitionSupported === "function"
+        ? isVoiceRecognitionSupported()
+        : Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+    voiceModeOnBtn.disabled = locked || !voiceSupported;
   }
   if (voiceModeOffBtn) {
     voiceModeOffBtn.disabled = locked;

@@ -478,6 +478,16 @@ body.inputs-locked #keyboard-toggle:disabled {
   cursor: not-allowed;
 }
 
+.voice-support-notice {
+  margin: 0;
+  color: var(--warning);
+  font: 500 0.78rem/1.35 "Segoe UI", system-ui, sans-serif;
+}
+
+.voice-support-notice[hidden] {
+  display: none;
+}
+
 .commands-dropdown-toggle {
   display: flex;
   align-items: center;

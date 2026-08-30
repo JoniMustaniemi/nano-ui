@@ -175,8 +175,12 @@ def test_browser_voice_sends_text_to_pi() -> None:
     assert "normalizeArmedVoiceCommand" in voice_js
     assert "isWakeWordOnlyMessage" in voice_js
     assert "waitingForWakeCommand" in state_js
-    assert "ensureMicrophonePermission" in voice_js
-    assert "getUserMedia" in voice_js
+    assert "isVoiceRecognitionSupported" in voice_js
+    assert "tryInterimWakeWord" in voice_js
+    assert "connectBrowserMicrophoneIfEnabled" in voice_js
+    assert "fromGesture" in voice_js
+    assert "ensureMicrophonePermission" not in voice_js
+    assert "getUserMedia" not in voice_js
     assert 'source !== "voice"' in chat_js.split("isViewSessionActive()", 1)[1].split("if (isSystemCommandId", 1)[0]
 
 
@@ -612,6 +616,8 @@ def test_voice_mode_toggle_integration() -> None:
 
     assert 'id="voice-mode-on"' in html_text
     assert 'id="voice-mode-off"' in html_text
+    assert 'id="voice-support-notice"' in html_text
+    assert "voiceSupportNotice" in state_js
     assert "voiceModeEnabled" in state_js
     assert "VOICE_MODE_STORAGE_KEY" in state_js
     assert "setVoiceModeEnabled" in voice_js
@@ -626,3 +632,9 @@ def test_voice_mode_toggle_integration() -> None:
         1,
     )[0]
     assert "connectBrowserMicrophone" in set_voice_mode_fn
+    init_voice_mode_fn = voice_js.split("function initVoiceModeControl", 1)[1].split(
+        "let voiceAnswerPrompt",
+        1,
+    )[0]
+    assert "connectBrowserMicrophoneIfEnabled" not in init_voice_mode_fn
+    assert "applyUnsupportedVoiceModeState" in init_voice_mode_fn

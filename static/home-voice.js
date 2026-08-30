@@ -114,14 +114,54 @@ function saveVoiceModeEnabled(enabled) {
 }
 
 function syncVoiceModeToggleUi() {
+  const supported = isVoiceRecognitionSupported();
   if (voiceModeOnBtn) {
     voiceModeOnBtn.classList.toggle("active", voiceModeEnabled);
     voiceModeOnBtn.setAttribute("aria-pressed", voiceModeEnabled ? "true" : "false");
+    voiceModeOnBtn.disabled = !supported;
   }
   if (voiceModeOffBtn) {
     voiceModeOffBtn.classList.toggle("active", !voiceModeEnabled);
     voiceModeOffBtn.setAttribute("aria-pressed", !voiceModeEnabled ? "true" : "false");
   }
+}
+
+function setVoiceSupportNotice(text) {
+  if (!voiceSupportNotice) {
+    return;
+  }
+  const message = (text || "").trim();
+  if (!message) {
+    voiceSupportNotice.hidden = true;
+    voiceSupportNotice.textContent = "";
+    return;
+  }
+  voiceSupportNotice.hidden = false;
+  voiceSupportNotice.textContent = message;
+}
+
+function resolveVoiceRecognitionErrorMessage(errorCode) {
+  switch (errorCode) {
+    case "not-allowed":
+    case "service-not-allowed":
+      return "Microphone access was not granted.";
+    case "audio-capture":
+      return "No microphone was found.";
+    case "network":
+      return "Speech recognition needs a network connection.";
+    case "language-not-supported":
+      return "Speech recognition is not available for this language.";
+    default:
+      return `Speech recognition failed: ${errorCode}`;
+  }
+}
+
+function reportVoiceRecognitionError(errorCode) {
+  const message = resolveVoiceRecognitionErrorMessage(errorCode);
+  microphoneReady = false;
+  setVoiceSupportNotice(message);
+  setVoiceStatus(message);
+  renderState();
 }
 
 const WAKE_WORD_PATTERN = /\b(?:hey|hay|hi)\s*,?\s*(?:nano|nanno|nana|nah no|na no)\b/i;
@@ -138,10 +178,30 @@ let wakeCommandArmed = false;
 let wakeCommandArmedUntil = 0;
 let wakeCommandArmedAt = 0;
 let recentVoiceSegments = [];
-let microphoneStream = null;
+let lastInterimWakeCheck = { text: "", at: 0 };
+
+const VOICE_UNSUPPORTED_MESSAGE =
+  "Voice commands require Chrome or Safari. This browser does not support speech recognition yet.";
+const VOICE_INSECURE_CONTEXT_MESSAGE =
+  "Voice commands require a secure connection (HTTPS).";
 
 function getSpeechRecognitionConstructor() {
   return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+function isVoiceRecognitionSupported() {
+  if (!window.isSecureContext) {
+    return false;
+  }
+  return Boolean(getSpeechRecognitionConstructor());
+}
+
+function isCoarsePointerDevice() {
+  try {
+    return window.matchMedia("(pointer: coarse)").matches;
+  } catch (_error) {
+    return false;
+  }
 }
 
 function resetWakeCommandWindow() {
@@ -394,6 +454,7 @@ function startWakeWordRecognition() {
 
   recognition.onresult = (event) => {
     let pendingFinal = "";
+    let pendingInterim = "";
     for (let index = event.resultIndex; index < event.results.length; index += 1) {
       const result = event.results[index];
       const transcript = (result[0]?.transcript || "").trim();
@@ -402,22 +463,29 @@ function startWakeWordRecognition() {
       }
       if (result.isFinal) {
         pendingFinal = pendingFinal ? `${pendingFinal} ${transcript}` : transcript;
+      } else {
+        pendingInterim = pendingInterim ? `${pendingInterim} ${transcript}` : transcript;
       }
     }
     if (pendingFinal) {
       void handleVoiceTranscript(pendingFinal);
+      return;
+    }
+    if (pendingInterim) {
+      tryInterimWakeWord(pendingInterim);
     }
   };
 
   recognition.onerror = (event) => {
     if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-      microphoneReady = false;
-      setVoiceStatus("Microphone access was not granted.");
-      renderState();
+      reportVoiceRecognitionError(event.error);
       return;
     }
     if (event.error !== "aborted" && event.error !== "no-speech") {
-      replyStatus.textContent = `Speech recognition failed: ${event.error}`;
+      reportVoiceRecognitionError(event.error);
+      if (replyStatus) {
+        replyStatus.textContent = resolveVoiceRecognitionErrorMessage(event.error);
+      }
     }
   };
 
@@ -453,31 +521,36 @@ function resumeWakeWordListening() {
   startWakeWordRecognition();
 }
 
-function releaseMicrophoneStream() {
-  if (!microphoneStream) {
+function tryInterimWakeWord(transcript) {
+  if (!isCoarsePointerDevice()) {
     return;
   }
-  for (const track of microphoneStream.getTracks()) {
-    track.stop();
+  const text = (transcript || "").trim();
+  if (!text || acceptsVoiceWithoutWakeWord() || requestInFlight || speakingActive) {
+    return;
   }
-  microphoneStream = null;
-}
+  const now = Date.now();
+  if (text === lastInterimWakeCheck.text && now - lastInterimWakeCheck.at < 1200) {
+    return;
+  }
+  lastInterimWakeCheck = { text, at: now };
 
-async function ensureMicrophonePermission() {
-  if (microphoneStream) {
-    return true;
-  }
-  if (!navigator.mediaDevices?.getUserMedia) {
-    return true;
-  }
-  try {
-    microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    return true;
-  } catch (_error) {
-    microphoneReady = false;
-    setVoiceStatus("Microphone access was not granted.");
-    renderState();
-    return false;
+  for (const candidate of voiceTranscriptCandidates(text)) {
+    const match = candidate.match(WAKE_WORD_PATTERN);
+    if (!match) {
+      continue;
+    }
+    const command = textAfterWakeWord(candidate, match);
+    if (command && !isWakeWordOnlyMessage(command)) {
+      void handleVoiceTranscript(candidate);
+      return;
+    }
+    if (!wakeCommandArmed) {
+      armWakeCommandWindow();
+      acknowledgeWakeWordOnly();
+      clearRecentVoiceSegments();
+    }
+    return;
   }
 }
 
@@ -486,7 +559,39 @@ function releaseMicrophone() {
   resetWakeCommandWindow();
   clearRecentVoiceSegments();
   microphoneReady = false;
-  releaseMicrophoneStream();
+}
+
+async function connectBrowserMicrophone() {
+  if (!voiceModeEnabled) {
+    releaseMicrophone();
+    return false;
+  }
+  if (!isVoiceRecognitionSupported()) {
+    setVoiceSupportNotice(
+      window.isSecureContext ? VOICE_UNSUPPORTED_MESSAGE : VOICE_INSECURE_CONTEXT_MESSAGE,
+    );
+    setVoiceStatus(
+      window.isSecureContext ? VOICE_UNSUPPORTED_MESSAGE : VOICE_INSECURE_CONTEXT_MESSAGE,
+    );
+    return false;
+  }
+  recognitionPaused = false;
+  setVoiceSupportNotice("");
+  if (startWakeWordRecognition()) {
+    return true;
+  }
+  scheduleWakeWordRestart(500);
+  return true;
+}
+
+async function connectBrowserMicrophoneIfEnabled({ fromGesture = false } = {}) {
+  if (!voiceModeEnabled) {
+    return;
+  }
+  if (!fromGesture && !microphoneReady) {
+    return;
+  }
+  await connectBrowserMicrophone();
 }
 
 async function handleVoiceTranscript(transcript) {
@@ -514,33 +619,6 @@ async function handleVoiceTranscript(transcript) {
   }
 }
 
-async function connectBrowserMicrophone() {
-  if (!voiceModeEnabled) {
-    releaseMicrophone();
-    return false;
-  }
-  if (!getSpeechRecognitionConstructor()) {
-    setVoiceStatus("Speech recognition is not available in this browser.");
-    return false;
-  }
-  if (!(await ensureMicrophonePermission())) {
-    return false;
-  }
-  recognitionPaused = false;
-  if (startWakeWordRecognition()) {
-    return true;
-  }
-  scheduleWakeWordRestart(500);
-  return true;
-}
-
-async function connectBrowserMicrophoneIfEnabled() {
-  if (!voiceModeEnabled) {
-    return;
-  }
-  await connectBrowserMicrophone();
-}
-
 async function setVoiceModeEnabled(enabled, { persist = true } = {}) {
   const nextEnabled = Boolean(enabled);
 
@@ -551,6 +629,7 @@ async function setVoiceModeEnabled(enabled, { persist = true } = {}) {
       saveVoiceModeEnabled(false);
     }
     syncVoiceModeToggleUi();
+    setVoiceSupportNotice("");
     setVoiceStatus("Voice on standby.");
     if (typeof restoreBaseAnswer === "function") {
       restoreBaseAnswer();
@@ -559,18 +638,22 @@ async function setVoiceModeEnabled(enabled, { persist = true } = {}) {
     return;
   }
 
-  voiceModeEnabled = true;
-  syncVoiceModeToggleUi();
-  if (!getSpeechRecognitionConstructor()) {
+  if (!isVoiceRecognitionSupported()) {
     voiceModeEnabled = false;
     if (persist) {
       saveVoiceModeEnabled(false);
     }
     syncVoiceModeToggleUi();
-    setVoiceStatus("Speech recognition is not available in this browser.");
+    const message = window.isSecureContext ? VOICE_UNSUPPORTED_MESSAGE : VOICE_INSECURE_CONTEXT_MESSAGE;
+    setVoiceSupportNotice(message);
+    setVoiceStatus(message);
     renderState();
     return;
   }
+
+  voiceModeEnabled = true;
+  syncVoiceModeToggleUi();
+  setVoiceSupportNotice("");
   if (persist) {
     saveVoiceModeEnabled(true);
   }
@@ -583,8 +666,28 @@ async function setVoiceModeEnabled(enabled, { persist = true } = {}) {
   renderState();
 }
 
+function applyUnsupportedVoiceModeState() {
+  if (isVoiceRecognitionSupported()) {
+    setVoiceSupportNotice("");
+    return;
+  }
+  if (voiceModeEnabled) {
+    voiceModeEnabled = false;
+    saveVoiceModeEnabled(false);
+    releaseMicrophone();
+  }
+  syncVoiceModeToggleUi();
+  const message = window.isSecureContext ? VOICE_UNSUPPORTED_MESSAGE : VOICE_INSECURE_CONTEXT_MESSAGE;
+  setVoiceSupportNotice(message);
+}
+
 function initVoiceModeControl() {
-  voiceModeEnabled = loadVoiceModeEnabled();
+  applyUnsupportedVoiceModeState();
+  if (isVoiceRecognitionSupported()) {
+    voiceModeEnabled = loadVoiceModeEnabled();
+  } else {
+    voiceModeEnabled = false;
+  }
   syncVoiceModeToggleUi();
   if (voiceModeOnBtn && voiceModeOnBtn.dataset.bound !== "true") {
     voiceModeOnBtn.dataset.bound = "true";
@@ -597,9 +700,6 @@ function initVoiceModeControl() {
     voiceModeOffBtn.addEventListener("click", () => {
       void setVoiceModeEnabled(false);
     });
-  }
-  if (voiceModeEnabled) {
-    void connectBrowserMicrophoneIfEnabled();
   }
 }
 
@@ -665,7 +765,7 @@ async function syncVoiceListeningState() {
   if (!isVoiceStatusOverridden() && voiceModeEnabled) {
     setVoiceStatus(resolveVoiceModeStatusText());
   }
-  if (voiceModeEnabled && !shouldPauseWakeWordListening()) {
+  if (voiceModeEnabled && microphoneReady && !shouldPauseWakeWordListening()) {
     resumeWakeWordListening();
   }
   if (typeof renderState === "function") {
@@ -677,7 +777,7 @@ function maybeStartListeningAfterGesture() {
   if (!voiceModeEnabled) {
     return;
   }
-  void connectBrowserMicrophoneIfEnabled();
+  void connectBrowserMicrophoneIfEnabled({ fromGesture: true });
 }
 
 let voiceAudioContext = null;
