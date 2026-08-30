@@ -9,6 +9,7 @@ const HOME_SCRIPT_ORDER = [
   "home-activity.js",
   "home-reconnect.js",
   "home-chat.js",
+  "home-weather.js",
   "home-bootstrap.js",
 ];
 

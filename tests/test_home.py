@@ -14,6 +14,7 @@ HOME_JS_MODULES = (
     "home-activity.js",
     "home-reconnect.js",
     "home-chat.js",
+    "home-weather.js",
     "home-bootstrap.js",
 )
 
@@ -55,6 +56,25 @@ def test_homepage_shows_standby_ui() -> None:
     assert 'class="nano-version"' in response_text
     assert 'id="cpu-temp-chip"' in response_text
     assert 'id="cpu-temp-chip" class="cpu-temp-chip" hidden' in response_text
+    assert 'id="weather-chip"' in response_text
+    assert 'id="weather-chip" class="weather-chip" hidden' in response_text
+
+
+def test_weather_chip_integration() -> None:
+    html_text = _load_index_html()
+    weather_js = (STATIC_DIR / "home-weather.js").read_text(encoding="utf-8")
+    activity_js = (STATIC_DIR / "home-activity.js").read_text(encoding="utf-8")
+    state_js = (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
+    css_text = _load_home_css()
+
+    assert 'id="weather-chip"' in html_text
+    assert "weatherChip" in state_js
+    assert "initWeatherOnce" in weather_js
+    assert "applyWeather" in weather_js
+    assert 'nanoFetch("/api/location"' in weather_js
+    assert 'nanoFetch("/api/weather/current")' in weather_js
+    assert "initWeatherOnce" in activity_js
+    assert ".weather-chip" in css_text
 
 
 def test_cpu_temperature_footer_integration() -> None:

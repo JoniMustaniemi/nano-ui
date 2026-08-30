@@ -18,6 +18,7 @@ const commandsList = document.getElementById("commands-list");
 const voiceVolumeInput = document.getElementById("voice-volume");
 const voiceVolumeValue = document.getElementById("voice-volume-value");
 const cpuTempChip = document.getElementById("cpu-temp-chip");
+const weatherChip = document.getElementById("weather-chip");
 const connectionUrlInput = document.getElementById("nano-connection-url");
 const connectionKeyInput = document.getElementById("nano-connection-key");
 const connectionStatus = document.getElementById("nano-connection-status");

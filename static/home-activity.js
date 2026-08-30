@@ -2369,6 +2369,7 @@ async function bootstrap() {
     bindActiveStopwatchActions();
     bindActiveTimerNameEdit();
     startSystemMetricsPolling();
+    void initWeatherOnce();
     if (typeof loadNanoVersionFromBackend === "function") {
       await loadNanoVersionFromBackend();
     }
