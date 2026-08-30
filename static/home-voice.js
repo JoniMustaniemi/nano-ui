@@ -181,6 +181,7 @@ let wakeCommandArmedUntil = 0;
 let wakeCommandArmedAt = 0;
 let recentVoiceSegments = [];
 let lastInterimWakeCheck = { text: "", at: 0 };
+let armedCommandBuffer = "";
 
 const VOICE_UNSUPPORTED_MESSAGE =
   "Voice commands require Chrome or Safari. This browser does not support speech recognition yet.";
@@ -208,10 +209,58 @@ function isCoarsePointerDevice() {
 
 function resetWakeCommandWindow() {
   clearArmedCommandDebounce();
+  clearArmedCommandBuffer();
   wakeCommandArmed = false;
   wakeCommandArmedUntil = 0;
   wakeCommandArmedAt = 0;
   waitingForWakeCommand = false;
+}
+
+function clearArmedCommandBuffer() {
+  armedCommandBuffer = "";
+}
+
+function mergeArmedCommandTranscript(previous, next) {
+  const prev = (previous || "").trim();
+  const nextText = (next || "").trim();
+  if (!nextText) {
+    return prev;
+  }
+  if (!prev) {
+    return nextText;
+  }
+  const prevLower = prev.toLowerCase();
+  const nextLower = nextText.toLowerCase();
+  if (prevLower === nextLower) {
+    return prev;
+  }
+  if (nextLower.startsWith(prevLower)) {
+    return nextText;
+  }
+  if (prevLower.startsWith(nextLower)) {
+    return prev;
+  }
+  if (nextLower.includes(prevLower)) {
+    return nextText;
+  }
+  if (prevLower.includes(nextLower)) {
+    return prev;
+  }
+  const prevWords = prev.split(/\s+/);
+  const nextWords = nextText.split(/\s+/);
+  for (let overlap = Math.min(prevWords.length, nextWords.length); overlap > 0; overlap -= 1) {
+    const prevSuffix = prevWords.slice(-overlap).join(" ").toLowerCase();
+    const nextPrefix = nextWords.slice(0, overlap).join(" ").toLowerCase();
+    if (prevSuffix === nextPrefix) {
+      const merged = `${prevWords.slice(0, -overlap).join(" ")} ${nextText}`.trim();
+      return merged || nextText;
+    }
+  }
+  return nextText.length >= prev.length ? nextText : prev;
+}
+
+function updateArmedCommandBuffer(transcript) {
+  armedCommandBuffer = mergeArmedCommandTranscript(armedCommandBuffer, transcript);
 }
 
 function clearArmedCommandDebounce() {
@@ -241,7 +290,7 @@ async function flushArmedCommandSubmit() {
   if (now - wakeCommandArmedAt < WAKE_COMMAND_GRACE_MS) {
     return;
   }
-  const command = normalizeArmedVoiceCommand(combinedRecentVoiceText());
+  const command = normalizeArmedVoiceCommand(armedCommandBuffer);
   if (!command || shouldIgnoreDuplicateVoiceMessage(command)) {
     return;
   }
@@ -259,6 +308,7 @@ async function flushArmedCommandSubmit() {
 }
 
 function armWakeCommandWindow() {
+  clearArmedCommandBuffer();
   wakeCommandArmed = true;
   wakeCommandArmedAt = Date.now();
   wakeCommandArmedUntil = wakeCommandArmedAt + WAKE_COMMAND_WINDOW_MS;
@@ -631,14 +681,18 @@ async function handleVoiceTranscript(transcript) {
   if (requestInFlight || speakingActive) {
     return;
   }
-  pushRecentVoiceSegment(transcript);
+  if (wakeCommandArmed) {
+    updateArmedCommandBuffer(transcript);
+  } else {
+    pushRecentVoiceSegment(transcript);
+  }
 
   const message = extractVoiceCommand(transcript);
 
   if (wakeCommandArmed && !message) {
     const now = Date.now();
     if (now <= wakeCommandArmedUntil && now - wakeCommandArmedAt >= WAKE_COMMAND_GRACE_MS) {
-      const pendingCommand = normalizeArmedVoiceCommand(combinedRecentVoiceText());
+      const pendingCommand = normalizeArmedVoiceCommand(armedCommandBuffer);
       if (pendingCommand) {
         scheduleArmedCommandSubmit();
       }

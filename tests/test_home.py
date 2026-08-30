@@ -180,6 +180,9 @@ def test_browser_voice_sends_text_to_pi() -> None:
     assert "scheduleArmedCommandSubmit" in voice_js
     assert "flushArmedCommandSubmit" in voice_js
     assert "ARMED_COMMAND_DEBOUNCE_MS" in voice_js
+    assert "mergeArmedCommandTranscript" in voice_js
+    assert "armedCommandBuffer" in voice_js
+    assert "updateArmedCommandBuffer" in voice_js
     try_interim_fn = voice_js.split("function tryInterimWakeWord", 1)[1].split(
         "function releaseMicrophone",
         1,
@@ -189,9 +192,8 @@ def test_browser_voice_sends_text_to_pi() -> None:
         "async function setVoiceModeEnabled",
         1,
     )[0]
-    assert handle_transcript_fn.index("pushRecentVoiceSegment") < handle_transcript_fn.index(
-        "extractVoiceCommand",
-    )
+    assert "updateArmedCommandBuffer" in handle_transcript_fn
+    assert "normalizeArmedVoiceCommand(armedCommandBuffer)" in voice_js
     assert "connectBrowserMicrophoneIfEnabled" in voice_js
     assert "fromGesture" in voice_js
     assert "ensureMicrophonePermission" not in voice_js
