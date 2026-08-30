@@ -177,6 +177,21 @@ def test_browser_voice_sends_text_to_pi() -> None:
     assert "waitingForWakeCommand" in state_js
     assert "isVoiceRecognitionSupported" in voice_js
     assert "tryInterimWakeWord" in voice_js
+    assert "scheduleArmedCommandSubmit" in voice_js
+    assert "flushArmedCommandSubmit" in voice_js
+    assert "ARMED_COMMAND_DEBOUNCE_MS" in voice_js
+    try_interim_fn = voice_js.split("function tryInterimWakeWord", 1)[1].split(
+        "function releaseMicrophone",
+        1,
+    )[0]
+    assert "handleVoiceTranscript" not in try_interim_fn
+    handle_transcript_fn = voice_js.split("async function handleVoiceTranscript", 1)[1].split(
+        "async function setVoiceModeEnabled",
+        1,
+    )[0]
+    assert handle_transcript_fn.index("pushRecentVoiceSegment") < handle_transcript_fn.index(
+        "extractVoiceCommand",
+    )
     assert "connectBrowserMicrophoneIfEnabled" in voice_js
     assert "fromGesture" in voice_js
     assert "ensureMicrophonePermission" not in voice_js
