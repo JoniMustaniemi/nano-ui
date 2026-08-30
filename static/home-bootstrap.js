@@ -63,17 +63,32 @@ async function handleStartupGesture() {
 window.addEventListener("pointerdown", handleStartupGesture, { passive: true });
 window.addEventListener("keydown", handleStartupGesture);
 window.addEventListener("beforeunload", () => {
-  if (microphoneStream) {
-    for (const track of microphoneStream.getTracks()) {
-      track.stop();
-    }
-  }
+  releaseMicrophone();
   if (mainEssence) {
     mainEssence.destroy();
   }
 });
 
 const nanoVersion = document.getElementById("nano-version");
+
+function formatClockTime(date = new Date()) {
+  return date.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function updateClockChip() {
+  if (!clockChip) {
+    return;
+  }
+  clockChip.textContent = formatClockTime();
+}
+
+function startClockChip() {
+  updateClockChip();
+  window.setInterval(updateClockChip, 1000);
+}
 
 async function loadNanoVersionFromBackend() {
   if (!nanoVersion) {
@@ -98,6 +113,7 @@ window.loadNanoVersionFromBackend = loadNanoVersionFromBackend;
 async function completeStartupAfterConnection() {
   await loadNanoVersionFromBackend();
   void initVoiceVolumeControl();
+  initVoiceModeControl();
   restoreBaseAnswer();
   setVoiceStatus("Voice on standby.");
   syncVoiceListeningState();
@@ -107,6 +123,7 @@ async function completeStartupAfterConnection() {
 window.completeStartupAfterConnection = completeStartupAfterConnection;
 
 window.addEventListener("load", () => {
+  startClockChip();
   requestAnimationFrame(async () => {
     initEssence();
     applyControlsVisibility();
@@ -116,6 +133,7 @@ window.addEventListener("load", () => {
     }
     await loadNanoVersionFromBackend();
     void initVoiceVolumeControl();
+    initVoiceModeControl();
     restoreBaseAnswer();
     setVoiceStatus("Voice on standby.");
     syncVoiceListeningState();

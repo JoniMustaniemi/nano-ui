@@ -1,13 +1,13 @@
 const VIEW_TITLES = {
   brains: "Brains",
-  storage: "Stored data",
+  storage: "Saved timers",
   commands: "Commands",
   calendar: "Calendar",
 };
 
 const VIEW_OPEN_ACK = {
   brains: "Opening Brains.",
-  storage: "Opening stored data.",
+  storage: "Opening saved timers.",
   commands: "Opening commands.",
   calendar: "Opening Calendar.",
 };
@@ -50,7 +50,7 @@ function showViewPanel(view) {
 
 async function loadViewData(view) {
   if (view === "storage") {
-    await refreshStorage();
+    refreshStorage();
     return;
   }
   if (view === "commands") {
@@ -62,6 +62,7 @@ async function loadViewData(view) {
     }
     expandCommandDropdowns();
     applyVoiceVolume();
+    syncVoiceModeToggleUi();
     return;
   }
   if (view === "calendar") {
@@ -114,7 +115,11 @@ function ensureViewSessionListening() {
   viewSessionListening = true;
   waitingForVoiceAnswer = false;
   waitingForFollowUp = false;
-  setVoiceStatus("Tap close to dismiss.");
+  if (voiceModeEnabled) {
+    setVoiceStatus(resolveVoiceModeStatusText());
+  } else {
+    setVoiceStatus("Tap close to dismiss.");
+  }
   renderState();
 }
 
@@ -142,6 +147,10 @@ function openViewModalShell(view) {
 function closeViewModalShell() {
   if (!viewModal) {
     return;
+  }
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && viewModal.contains(active)) {
+    active.blur();
   }
   viewModal.classList.remove("open");
   viewModal.setAttribute("aria-hidden", "true");
@@ -192,7 +201,7 @@ async function openViewSession(view, { source = "ui" } = {}) {
     }
   }
 
-  if (source === "voice" || microphoneReady) {
+  if (source === "voice" || voiceModeEnabled) {
     ensureViewSessionListening();
   }
   renderState();

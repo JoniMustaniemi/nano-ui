@@ -137,7 +137,3 @@ body.connection-waiting .view-modal {
   color: #fff;
   cursor: pointer;
 }
-
-.voice-push-toggle.recording {
-  color: #ff6b6b;
-}

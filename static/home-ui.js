@@ -23,19 +23,31 @@ function isWorkingOnTask() {
 }
 
 const LAST_COMMAND_CATEGORIES = ["System"];
-const EXCLUDED_COMMAND_CATEGORIES = new Set(["git", "github"]);
+const EXCLUDED_COMMAND_CATEGORIES = new Set(["git", "github", "weather"]);
 const GIT_PR_COMMAND_PATTERN =
   /\b(commit|pull request|pull_request|create pr|gh pr|git push|git commit)\b/i;
 const ACTIVE_TIMERS_COMMAND_PATTERN = /\bactive\s+timers?\b/i;
-const SUPPLEMENTAL_TOOL_COMMANDS = [
-  {
-    id: "clear_all_timers",
-    category: "Timers",
-    label: "Clear all timers",
-    description: "Clear every countdown timer and stopwatch.",
-    message: "Clear all timers.",
-  },
-];
+const WEATHER_COMMAND_PATTERN =
+  /\b(current\s+weather|what(?:'s| is)\s+the\s+weather)\b/i;
+const HIDDEN_TOOL_COMMAND_PATTERN =
+  /\b(rename\s+timer|rename\s+stopwatch|stop\s+stopwatches?|clear\s+all\s+timers|cancel\s+timers|system\s+analysis|health\s+check|wipe\s+(?:your\s+)?data|what\s+can\s+you\s+do|hide\s*\/\s*show\s+controls|hide\s+controls|show\s+controls|internal\s+notes?)\b/i;
+const EXCLUDED_TOOL_COMMAND_IDS = new Set([
+  "active_timers",
+  "list_active_timers",
+  "get_current_weather",
+  "rename_timer",
+  "rename_stopwatch",
+  "stop_stopwatches",
+  "cancel_timers",
+  "clear_all_timers",
+  "analyze_system",
+  "check_health",
+  "wipe_data",
+  "capabilities",
+  "toggle_controls",
+  "list_internal_notes",
+]);
+const SUPPLEMENTAL_TOOL_COMMANDS = [];
 const YES_NO_PENDING_KINDS = new Set(["wipe_confirmation", "presence_check"]);
 const YES_NO_INPUT_ACTIONS = [
   { label: "Yes", value: "yes", variant: "yes" },
@@ -54,7 +66,6 @@ const GENERIC_INPUT_ACTIONS = [
   { label: "Type answer", action: "open_keyboard" },
   { label: "Cancel", value: "cancel", variant: "no" },
 ];
-const FREE_TEXT_PENDING_KINDS = new Set(["note_name", "note_content"]);
 
 const VIEW_CLIENT_ACTIONS = {
   open_brains: "brains",
@@ -189,26 +200,6 @@ function setYesNoConfirmationActive(active) {
   syncInputActions();
 }
 
-function normalizePendingOptions(options) {
-  if (!Array.isArray(options)) {
-    return [];
-  }
-  return options
-    .map((option, index) => {
-      if (typeof option === "string") {
-        const text = option.trim();
-        return text ? { label: text, value: text } : null;
-      }
-      if (!option || typeof option !== "object") {
-        return null;
-      }
-      const label = String(option.label || option.title || option.name || `Option ${index + 1}`).trim();
-      const value = String(option.value || option.label || option.title || option.name || label).trim();
-      return label && value ? { label, value } : null;
-    })
-    .filter(Boolean);
-}
-
 function getInputActionsForCurrentState() {
   if (waitingForYesNoConfirmation || waitingForPresence) {
     return YES_NO_INPUT_ACTIONS;
@@ -218,15 +209,6 @@ function getInputActionsForCurrentState() {
   }
   if (currentAnswerPendingKind === "timer_duration" || currentInputKind === "timer_duration") {
     return TIMER_DURATION_INPUT_ACTIONS;
-  }
-  if (currentAnswerPendingKind === "note_selection") {
-    const optionActions = normalizePendingOptions(currentPendingSnapshot?.options);
-    if (optionActions.length) {
-      return [...optionActions, { label: "Cancel", value: "cancel", variant: "no" }];
-    }
-  }
-  if (currentAnswerPendingKind && FREE_TEXT_PENDING_KINDS.has(currentAnswerPendingKind)) {
-    return GENERIC_INPUT_ACTIONS;
   }
   if (isWaitingForUserAnswer()) {
     return GENERIC_INPUT_ACTIONS;
@@ -312,6 +294,12 @@ function updateInputLock() {
   if (keyboardToggle) {
     keyboardToggle.disabled = locked;
   }
+  if (voiceModeOnBtn) {
+    voiceModeOnBtn.disabled = locked;
+  }
+  if (voiceModeOffBtn) {
+    voiceModeOffBtn.disabled = locked;
+  }
   setCommandButtonsDisabled(locked);
   syncInputActions();
   document.body.classList.toggle("inputs-locked", locked);
@@ -338,13 +326,15 @@ function isExcludedToolCommand(command) {
     return true;
   }
   const id = String(command?.id || "").trim().toLowerCase();
-  if (id === "active_timers" || id === "list_active_timers") {
+  if (EXCLUDED_TOOL_COMMAND_IDS.has(id)) {
     return true;
   }
   const searchable = `${command?.id || ""} ${command?.message || ""} ${command?.label || ""}`;
   return (
     GIT_PR_COMMAND_PATTERN.test(searchable) ||
-    ACTIVE_TIMERS_COMMAND_PATTERN.test(searchable)
+    ACTIVE_TIMERS_COMMAND_PATTERN.test(searchable) ||
+    WEATHER_COMMAND_PATTERN.test(searchable) ||
+    HIDDEN_TOOL_COMMAND_PATTERN.test(searchable)
   );
 }
 
@@ -381,7 +371,7 @@ async function loadToolCommands() {
 
 function isTimerToolCommand(command) {
   const id = String(command?.id || "").toLowerCase();
-  if (id === "clear_all_timers" || id === "cancel_timers" || id === "stop_stopwatches") {
+  if (EXCLUDED_TOOL_COMMAND_IDS.has(id)) {
     return false;
   }
   const action = String(command?.client_action || "").toLowerCase();
@@ -460,14 +450,13 @@ function matchesSectionPatterns(normalized, patterns) {
 
 const BRAINS_SECTION_PATTERNS = [
   /^(open|show|go to)(\s+the)?\s+brains(\s+(tab|section|panel|view))?$/,
-  /^(open|show)(\s+the)?\s+internal notes$/,
   /\bwhat\s+are\s+you\s+thinking\b/,
   /\bwhat\s+you\s+are\s+thinking\b/,
   /\bwhat\s+you\s+re\s+thinking\b/,
   /\bwhats\s+on\s+your\s+mind\b/,
   /\bwhat\s+is\s+on\s+your\s+mind\b/,
-  /\b(show|see|view|open|look at|display|pull up|bring up)\b.*\b(your thoughts|your mind|internal notes|activity log|brains)\b/,
-  /\b(can|could|may|would|let)\s+(i|me|we)\s+(see|view|look at|open|show|have)\b.*\b(your thoughts|your mind|internal notes|activity log|brains)\b/,
+  /\b(show|see|view|open|look at|display|pull up|bring up)\b.*\b(your thoughts|your mind|activity log|brains)\b/,
+  /\b(can|could|may|would|let)\s+(i|me|we)\s+(see|view|look at|open|show|have)\b.*\b(your thoughts|your mind|activity log|brains)\b/,
   /\bwhat\s+(is|are)\s+in\s+(your\s+)?(mind|brains|activity)\b/,
   /\bwhat\s+have\s+you\s+been\s+thinking\b/,
   /\blet\s+me\s+see\s+your\s+brains\b/,
@@ -669,7 +658,7 @@ function uiCommandStatusMessage(command) {
   if (command.type === "section") {
     const labels = {
       brains: "Opening Brains.",
-      storage: "Opening stored data.",
+      storage: "Opening saved timers.",
       commands: "Opening commands.",
       calendar: "Opening Calendar.",
     };
@@ -795,16 +784,28 @@ function resolveListeningIntent() {
   if (waitingForFollowUp || waitingForVoiceAnswer) {
     return "follow_up";
   }
+  if (waitingForWakeCommand) {
+    return "wake_command";
+  }
+  if (voiceModeEnabled && !keyboardOpen) {
+    return "voice_mode";
+  }
   return null;
 }
 
 function isListeningStateActive() {
   const intent = resolveListeningIntent();
-  return intent === "presence" || intent === "follow_up" || intent === "view_session";
+  return (
+    intent === "presence" ||
+    intent === "follow_up" ||
+    intent === "view_session" ||
+    intent === "wake_command" ||
+    intent === "voice_mode"
+  );
 }
 
 function isWaitingForUserAnswer() {
-  return waitingForPresence || waitingForFollowUp || isListeningStateActive();
+  return waitingForPresence || waitingForFollowUp || waitingForVoiceAnswer;
 }
 
 function isWaitingForAnswerActivity() {
@@ -831,9 +832,15 @@ function resolveActivityHeadline() {
   } else if (waitingForFollowUp || waitingForVoiceAnswer) {
     headline = WAITING_FOR_ANSWER_HEADLINE;
     detail = "";
+  } else if (intent === "wake_command") {
+    headline = 'Heard "hey nano".';
+    detail = "What can I help with?";
   } else if (intent === "view_session") {
     headline = VIEW_SESSION_HEADLINE;
     detail = "";
+  } else if (intent === "voice_mode") {
+    headline = VOICE_READY_HEADLINE;
+    detail = microphoneReady ? VOICE_READY_DETAIL : VOICE_STARTING_DETAIL;
   } else if (displayState === "listening") {
     if (!headline || headline === STANDBY_HEADLINE) {
       headline = LISTENING_HEADLINE_DEFAULT;

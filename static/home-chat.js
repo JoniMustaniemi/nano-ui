@@ -151,8 +151,14 @@ async function submitMessage(message, source, commandHint, options = {}) {
     (waitingForYesNoConfirmation || waitingForPresence);
   const isConfirmationAnswer = confirmationAnswer || typedConfirmationAnswer;
   const isPendingInputAnswer = isConfirmationAnswer || inputAnswer;
+  const isVoicePendingAnswer =
+    source === "voice" &&
+    (waitingForFollowUp ||
+      waitingForVoiceAnswer ||
+      currentAnswerPendingKind === "timer_duration" ||
+      currentInputKind === "timer_duration");
 
-  if (isPendingInputAnswer) {
+  if (isPendingInputAnswer || isVoicePendingAnswer) {
     suppressPendingRearm = true;
   }
 
@@ -162,7 +168,7 @@ async function submitMessage(message, source, commandHint, options = {}) {
   syncInputActions();
   if (isConfirmationAnswer) {
     returnToWakeDetection();
-  } else if (inputAnswer) {
+  } else if (inputAnswer || isVoicePendingAnswer) {
     waitingForFollowUp = false;
     waitingForVoiceAnswer = false;
     currentInputKind = null;
@@ -172,7 +178,7 @@ async function submitMessage(message, source, commandHint, options = {}) {
     await completeUiCommand(source);
     return;
   }
-  if (isViewSessionActive() && source !== "command") {
+  if (isViewSessionActive() && source !== "command" && source !== "voice") {
     return;
   }
   if (isSystemCommandId(commandHint?.id)) {
@@ -264,7 +270,24 @@ async function submitMessage(message, source, commandHint, options = {}) {
     if (shouldSpeak) {
       await playVoice(answerText);
     }
-    ensureDirectAnswerListening();
+    if (answerNeedsVoiceFollowUp(answerText)) {
+      const isYesNoConfirmation =
+        answerNeedsYesNoConfirmation(answerText) ||
+        answerText.toLowerCase().includes("reply yes to proceed or no to cancel") ||
+        Boolean(pendingSystemCommandId);
+      const isTimerFollowUp = answerNeedsTimerDuration(answerText);
+      const followUpPrompt = isYesNoConfirmation
+        ? "Reply yes to confirm or no to cancel."
+        : 'Say your answer after "hey nano".';
+      setVoiceStatus('Say your answer after "hey nano".');
+      armVoiceFollowUp(followUpPrompt, {
+        yesNo: isYesNoConfirmation,
+        inputKind: isTimerFollowUp ? "timer_duration" : null,
+      });
+    } else {
+      returnToWakeDetection();
+    }
+    suppressPendingRearm = false;
     return;
   }
 
@@ -289,8 +312,8 @@ async function submitMessage(message, source, commandHint, options = {}) {
     const isTimerFollowUp = answerNeedsTimerDuration(answerText);
     const followUpPrompt = isYesNoConfirmation
       ? "Reply yes to confirm or no to cancel."
-      : "Hold the mic button and speak your answer.";
-    setVoiceStatus("Hold the mic button after I finish speaking.");
+      : 'Say your answer after "hey nano".';
+    setVoiceStatus('Say your answer after "hey nano".');
     await playVoice(answerText);
     armVoiceFollowUp(followUpPrompt, {
       yesNo: isYesNoConfirmation,

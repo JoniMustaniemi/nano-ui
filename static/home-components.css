@@ -435,6 +435,49 @@ body.inputs-locked #keyboard-toggle:disabled {
   cursor: not-allowed;
 }
 
+.commands-voice-mode {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.voice-mode-toggle {
+  display: inline-flex;
+  padding: 4px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.voice-mode-btn {
+  min-width: 52px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font: 700 0.78rem/1.2 "Cascadia Mono", "Consolas", monospace;
+  cursor: pointer;
+  transform: none;
+  filter: none;
+}
+
+.voice-mode-btn.active {
+  background: rgba(57, 255, 20, 0.12);
+  color: var(--accent-strong);
+}
+
+.voice-mode-btn:hover:not(:disabled) {
+  color: var(--accent-strong);
+}
+
+.voice-mode-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .commands-dropdown-toggle {
   display: flex;
   align-items: center;

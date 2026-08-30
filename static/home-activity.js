@@ -79,7 +79,7 @@ async function speakBootGreetingIfNeeded(greeting, bootKey) {
       } catch (_error) {
         // Ignore storage write failures and continue with playback.
       }
-      await playVoice(greeting, { pauseRecognition: true });
+      await playVoice(greeting);
       pendingBootGreetingSpeech = null;
       return true;
     } catch (_error) {
@@ -158,6 +158,11 @@ function applyPendingSnapshot(pending, proactive) {
   if (suppressPendingRearm) {
     currentAnswerPendingKind = null;
     currentPendingSnapshot = null;
+    currentInputKind = null;
+    if (!waitingForPresence) {
+      waitingForFollowUp = false;
+      waitingForVoiceAnswer = false;
+    }
     clearAnswerTimeoutTimer();
     answerTimeoutPending = false;
     syncInputActions();
@@ -166,8 +171,10 @@ function applyPendingSnapshot(pending, proactive) {
   if (!pending || typeof pending !== "object") {
     currentAnswerPendingKind = null;
     currentPendingSnapshot = null;
+    currentInputKind = null;
     if (!waitingForPresence) {
       waitingForFollowUp = false;
+      waitingForVoiceAnswer = false;
     }
     clearAnswerTimeoutTimer();
     answerTimeoutPending = false;
@@ -178,8 +185,10 @@ function applyPendingSnapshot(pending, proactive) {
   if (!kind) {
     currentAnswerPendingKind = null;
     currentPendingSnapshot = null;
+    currentInputKind = null;
     if (!waitingForPresence) {
       waitingForFollowUp = false;
+      waitingForVoiceAnswer = false;
     }
     clearAnswerTimeoutTimer();
     answerTimeoutPending = false;
@@ -229,6 +238,7 @@ function applyStatusSnapshot(snapshot) {
   syncActiveTimers(extractCountdownTimersFromSnapshot(snapshot));
   renderState();
   applySystemMetrics(snapshot.system);
+  refreshStorage();
 }
 
 function formatTaskWaitClock(seconds) {
@@ -2263,6 +2273,31 @@ function renderStorage(snapshot) {
   storageLog.scrollTop = 0;
 }
 
+function buildPersistedStateSnapshot() {
+  return {
+    active_timers: getDisplayCountdownTimers().map((timer) => ({
+      id: timer.id ?? null,
+      label: timer.label || "Timer",
+      started_at: timer.started_at ?? null,
+      due_at: timer.due_at ?? null,
+      remaining_seconds: timer.remaining_seconds ?? null,
+    })),
+    active_stopwatches: getDisplayStopwatches().map((stopwatch) => ({
+      id: stopwatch.id ?? null,
+      label: stopwatch.label || "Stopwatch",
+      started_at: stopwatch.started_at ?? null,
+      elapsed_seconds: stopwatch.elapsed_seconds ?? null,
+    })),
+  };
+}
+
+function refreshStorage() {
+  if (typeof getActiveViewSession === "function" && getActiveViewSession() !== "storage") {
+    return;
+  }
+  renderStorage(buildPersistedStateSnapshot());
+}
+
 const SYSTEM_METRICS_POLL_MS = 20_000;
 
 function formatCpuTemp(celsius) {
@@ -2330,32 +2365,17 @@ async function loadSnapshot() {
   return response.json();
 }
 
-async function loadStorage() {
-  const response = await nanoFetch("/api/storage");
-  if (!response.ok) {
-    throw new Error("Could not load storage snapshot.");
-  }
-  return response.json();
-}
-
 async function bootstrap() {
   try {
     const snapshot = await loadSnapshot();
-    const storage = await loadStorage();
     applyStatusSnapshot(snapshot);
     refreshEvents(snapshot);
-    renderStorage(storage);
-    const voiceResponse = await nanoFetch("/api/voice/status");
-    if (voiceResponse.ok) {
-      const voice = await voiceResponse.json();
-      voiceAvailable = Boolean(voice.available);
-      if (!voiceAvailable && typeof voice.detail === "string") {
-        replyStatus.textContent = voice.detail;
-      }
+    if (typeof fetchVoiceStatus === "function") {
+      await fetchVoiceStatus();
     }
     applyVoiceVolume();
     await loadAndRenderToolCommands();
-    await connectMicrophoneOnStartup();
+    await connectBrowserMicrophoneIfEnabled();
     const bootEvent = findLatestBootEvent(snapshot);
     void refreshStandbyGreeting({ speakOnce: true, bootEvent });
     const lastEventId = Array.isArray(snapshot.events)
@@ -2373,15 +2393,6 @@ async function bootstrap() {
     if (typeof loadNanoVersionFromBackend === "function") {
       await loadNanoVersionFromBackend();
     }
-  } catch (error) {
-    replyStatus.textContent = error.message;
-  }
-}
-
-async function refreshStorage() {
-  try {
-    const storage = await loadStorage();
-    renderStorage(storage);
   } catch (error) {
     replyStatus.textContent = error.message;
   }
@@ -2405,7 +2416,6 @@ function listen(lastEventId = 0) {
     const payload = JSON.parse(event.data);
     applyActivityEvent(payload);
     appendEvent(payload);
-    refreshStorage();
   });
   source.onerror = () => {
     if (reconnectInProgress) {

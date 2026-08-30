@@ -58,6 +58,21 @@ def test_homepage_shows_standby_ui() -> None:
     assert 'id="cpu-temp-chip" class="cpu-temp-chip" hidden' in response_text
     assert 'id="weather-chip"' in response_text
     assert 'id="weather-chip" class="weather-chip" hidden' in response_text
+    assert 'id="clock-chip"' in response_text
+    assert 'id="clock-chip" class="clock-chip"' in response_text
+
+
+def test_clock_chip_integration() -> None:
+    html_text = _load_index_html()
+    bootstrap_js = (STATIC_DIR / "home-bootstrap.js").read_text(encoding="utf-8")
+    state_js = (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
+    css_text = _load_home_css()
+
+    assert 'id="clock-chip"' in html_text
+    assert "clockChip" in state_js
+    assert "startClockChip" in bootstrap_js
+    assert "formatClockTime" in bootstrap_js
+    assert ".clock-chip" in css_text
 
 
 def test_weather_chip_integration() -> None:
@@ -120,29 +135,62 @@ def test_homepage_uses_remote_api_client() -> None:
     assert "nanoFetch" in js_text
     assert "nanoEventSource" in js_text
     assert "ensureApiConnection" in js_text
-    assert "sendVoiceCommand" in js_text
+    assert "handleVoiceTranscript" in js_text
     assert 'id="commands-toggle"' in html_text
     assert ".user-speech" in css_text
 
 
-def test_ui_does_not_run_browser_speech_recognition() -> None:
+def test_ui_does_not_run_legacy_wake_loop() -> None:
     js_text = _load_home_js()
 
-    assert "SpeechRecognition" not in js_text
-    assert "webkitSpeechRecognition" not in js_text
     assert "extractWakeCommand" not in js_text
     assert "pauseRecognitionForSpeech" not in js_text
     assert "listeningEnabled" not in js_text
     assert "wakeAcknowledging" not in js_text
 
 
-def test_voice_flow_uploads_audio_to_pi() -> None:
+def test_browser_voice_sends_text_to_pi() -> None:
+    voice_js = (STATIC_DIR / "home-voice.js").read_text(encoding="utf-8")
+    activity_js = (STATIC_DIR / "home-activity.js").read_text(encoding="utf-8")
+    chat_js = (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
+    state_js = (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
+    js_text = _load_home_js()
+
+    assert "startWakeWordRecognition" in voice_js
+    assert "extractVoiceCommand" in voice_js
+    assert "WAKE_WORD_PATTERN" in voice_js
+    assert "handleVoiceTranscript" in voice_js
+    assert "connectBrowserMicrophone" in voice_js
+    assert 'nanoFetch("/api/voice/transcribe"' not in voice_js
+    assert 'nanoFetch("/api/voice/mode"' not in voice_js
+    assert 'nanoFetch("/api/voice/command"' not in js_text
+    assert 'submitMessage(message, "voice")' in voice_js
+    assert "SpeechRecognition" in voice_js
+    assert "recognition.continuous = true" in voice_js
+    assert "connectBrowserMicrophoneIfEnabled" in activity_js
+    assert "waitingForVoiceAnswer" in voice_js
+    assert 'source === "voice"' in chat_js
+    assert "acceptsVoiceWithoutWakeWord" in voice_js
+    assert "armWakeCommandWindow" in voice_js
+    assert "normalizeArmedVoiceCommand" in voice_js
+    assert "isWakeWordOnlyMessage" in voice_js
+    assert "waitingForWakeCommand" in state_js
+    assert "ensureMicrophonePermission" in voice_js
+    assert "getUserMedia" in voice_js
+    assert 'source !== "voice"' in chat_js.split("isViewSessionActive()", 1)[1].split("if (isSystemCommandId", 1)[0]
+
+
+def test_voice_volume_loads_from_server() -> None:
     voice_js = (STATIC_DIR / "home-voice.js").read_text(encoding="utf-8")
 
-    assert 'nanoFetch("/api/voice/command"' in voice_js
-    assert "MediaRecorder" in voice_js
-    assert "FormData" in voice_js
-    assert "waitingForVoiceAnswer" in voice_js
+    assert "loadVoiceVolumeFromServer" in voice_js
+    assert 'method: "PUT"' in voice_js.split("syncVoiceVolumeToServer", 1)[1].split("function setVoiceVolumeFromInput", 1)[0]
+    load_volume_fn = voice_js.split("async function loadVoiceVolumeFromServer", 1)[1].split(
+        "async function syncVoiceVolumeToServer",
+        1,
+    )[0]
+    assert 'nanoFetch("/api/voice/volume"' in load_volume_fn
+    assert "method:" not in load_volume_fn or "GET" not in load_volume_fn
 
 
 def test_bootstrap_waits_for_api_connection() -> None:
@@ -186,7 +234,6 @@ def test_task_start_acknowledgment() -> None:
     assert "receivedAckPool" in state_js
     assert "isTaskAck: true" in chat_js
     assert "pickTaskAck()" in chat_js
-    assert 'acknowledgeRequest("voice")' in voice_js
     assert "forcePlayback" in voice_js
     assert "skipAnswerUpdate" in voice_js
     assert "resumeVoiceAudioContext" in chat_js
@@ -222,7 +269,6 @@ def test_reboot_restart_reconnect_helpers() -> None:
     assert restart_pool.count('"') // 2 >= 10
     assert reboot_pool.count('"') // 2 >= 10
     assert "resolveSystemCommandConfirmation(" in chat_js
-    assert "resolveSystemCommandConfirmation(" in voice_js
 
 
 def test_improvement_plans_removed() -> None:
@@ -262,13 +308,31 @@ def test_pending_input_actions() -> None:
     assert "TIMER_DURATION_INPUT_ACTIONS" in ui_js
     assert "GENERIC_INPUT_ACTIONS" in ui_js
     assert "getInputActionsForCurrentState" in ui_js
-    assert "normalizePendingOptions" in ui_js
     assert "syncInputActions" in ui_js
     assert "data-input-action" in bootstrap_js
     assert "submitInputAnswer" in bootstrap_js
     assert "open_keyboard" in bootstrap_js
     assert "timer_duration" in ui_js
-    assert "note_selection" in ui_js
+    assert "note_selection" not in ui_js
+    assert "note_name" not in ui_js
+    assert "FREE_TEXT_PENDING_KINDS" not in ui_js
+    assert "normalizePendingOptions" not in ui_js
+
+
+def test_voice_pending_answer_clears_waiting_state() -> None:
+    chat_js = (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
+    activity_js = (STATIC_DIR / "home-activity.js").read_text(encoding="utf-8")
+
+    submit_fn = chat_js.split("async function submitMessage", 1)[1].split("async function stopActiveStopwatch", 1)[0]
+    assert "isVoicePendingAnswer" in submit_fn
+    assert "returnToWakeDetection();" in submit_fn.split("if (isWaitingForUserAnswer())", 1)[1]
+    assert "ensureDirectAnswerListening();" not in submit_fn.split("if (isWaitingForUserAnswer())", 1)[1].split(
+        "if (!shouldSpeak)", 1
+    )[0]
+
+    pending_fn = activity_js.split("function applyPendingSnapshot", 1)[1].split("function applyStatusSnapshot", 1)[0]
+    assert "waitingForVoiceAnswer = false" in pending_fn
+    assert "currentInputKind = null" in pending_fn
 
 
 def test_timer_tool_command_helpers() -> None:
@@ -279,9 +343,7 @@ def test_timer_tool_command_helpers() -> None:
     assert "resolveToolCommandMessage" in ui_js
     assert "isTimerToolCommand" in ui_js
     assert 'return "Start a timer"' in ui_js
-    assert 'id === "clear_all_timers"' in ui_js
-    assert 'id === "cancel_timers"' in ui_js
-    assert 'id === "stop_stopwatches"' in ui_js
+    assert "EXCLUDED_TOOL_COMMAND_IDS" in ui_js
     assert 'source !== "command"' in chat_js
     assert "formatTimerDurationAnswer" in chat_js
     assert "answerNeedsTimerDuration" in voice_js
@@ -308,6 +370,7 @@ def test_clear_all_timers() -> None:
     assert "SUPPLEMENTAL_TOOL_COMMANDS" in ui_js
     assert "supplementToolCommands" in ui_js
     assert '"clear_all_timers"' in ui_js
+    assert "EXCLUDED_TOOL_COMMAND_IDS" in ui_js
 
 
 def test_active_timer_ui() -> None:
@@ -463,3 +526,103 @@ def test_git_pr_ui_removed() -> None:
     assert "declined to commit" not in ui_js
     assert "lint check" not in ui_js
     assert "tests failed" not in ui_js
+
+
+def test_weather_command_ui_removed() -> None:
+    ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+
+    assert "WEATHER_COMMAND_PATTERN" in ui_js
+    assert '"get_current_weather"' in ui_js
+    assert '"weather"' in ui_js
+    assert '"Current weather"' not in ui_js
+    assert '"Weather"' not in ui_js
+
+
+def test_hidden_tool_commands_ui_removed() -> None:
+    ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+
+    assert "EXCLUDED_TOOL_COMMAND_IDS" in ui_js
+    assert "HIDDEN_TOOL_COMMAND_PATTERN" in ui_js
+    for command_id in (
+        "rename_timer",
+        "rename_stopwatch",
+        "stop_stopwatches",
+        "cancel_timers",
+        "clear_all_timers",
+        "analyze_system",
+        "check_health",
+        "wipe_data",
+        "capabilities",
+        "toggle_controls",
+        "list_internal_notes",
+    ):
+        assert f'"{command_id}"' in ui_js
+    assert '"Clear all timers"' not in ui_js
+    assert '"Cancel timers"' not in ui_js
+    assert '"Rename timer"' not in ui_js
+    assert '"Stop stopwatch"' not in ui_js
+    assert '"System analysis"' not in ui_js
+    assert '"Health check"' not in ui_js
+    assert '"Wipe data"' not in ui_js
+    assert '"What can you do?"' not in ui_js
+    assert '"Hide/show controls"' not in ui_js
+    assert '"Internal notes"' not in ui_js
+    assert "internal notes" not in ui_js.split("BRAINS_SECTION_PATTERNS")[1].split("STORAGE_SECTION_PATTERNS")[0]
+
+
+def test_saved_timers_panel_uses_runtime_state() -> None:
+    html_text = _load_index_html()
+    activity_js = (STATIC_DIR / "home-activity.js").read_text(encoding="utf-8")
+    view_session_js = (STATIC_DIR / "home-view-session.js").read_text(encoding="utf-8")
+
+    assert "Saved timers" in html_text
+    assert "buildPersistedStateSnapshot" in activity_js
+    assert "refreshStorage" in activity_js
+    assert "/api/storage" not in activity_js
+    assert "loadStorage" not in activity_js
+    assert 'storage: "Saved timers"' in view_session_js
+
+
+def test_voice_mode_is_ui_toggle_only() -> None:
+    ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+    voice_js = (STATIC_DIR / "home-voice.js").read_text(encoding="utf-8")
+    state_js = (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
+    html_text = _load_index_html()
+    js_text = _load_home_js()
+
+    waiting_fn = ui_js.split("function isWaitingForUserAnswer()", 1)[1].split("function isWaitingForAnswerActivity", 1)[0]
+    assert "isListeningStateActive()" not in waiting_fn
+    assert "connectBrowserMicrophone" in voice_js
+    assert "microphoneReady" in state_js
+    assert "VOICE_STARTING_DETAIL" in state_js
+    assert "microphoneReady ? VOICE_READY_DETAIL : VOICE_STARTING_DETAIL" in ui_js
+    assert "pauseWakeWordListening" in voice_js
+    assert "resumeWakeWordListening" in voice_js
+    assert "voice-push-toggle" not in html_text
+    assert "pushToTalkActive" not in voice_js
+
+
+def test_voice_mode_toggle_integration() -> None:
+    html_text = _load_index_html()
+    voice_js = (STATIC_DIR / "home-voice.js").read_text(encoding="utf-8")
+    ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+    state_js = (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
+    bootstrap_js = (STATIC_DIR / "home-bootstrap.js").read_text(encoding="utf-8")
+    css_text = _load_home_css()
+
+    assert 'id="voice-mode-on"' in html_text
+    assert 'id="voice-mode-off"' in html_text
+    assert "voiceModeEnabled" in state_js
+    assert "VOICE_MODE_STORAGE_KEY" in state_js
+    assert "setVoiceModeEnabled" in voice_js
+    assert "initVoiceModeControl" in voice_js
+    assert "connectBrowserMicrophoneIfEnabled" in voice_js
+    assert "initVoiceModeControl" in bootstrap_js
+    assert '"voice_mode"' in ui_js
+    assert 'id="voice-push-toggle"' not in html_text
+    assert ".voice-mode-toggle" in css_text
+    set_voice_mode_fn = voice_js.split("async function setVoiceModeEnabled", 1)[1].split(
+        "function initVoiceModeControl",
+        1,
+    )[0]
+    assert "connectBrowserMicrophone" in set_voice_mode_fn

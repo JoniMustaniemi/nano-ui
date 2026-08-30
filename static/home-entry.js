@@ -28,5 +28,5 @@ for (const file of HOME_SCRIPT_ORDER) {
   if (file === "nano-api.js" || file === "nano-settings.js") {
     continue;
   }
-  await loadClassicScript(`./static/${file}?v=module-entry-12`);
+  await loadClassicScript(`./static/${file}?v=module-entry-20`);
 }

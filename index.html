@@ -27,7 +27,7 @@
 }
 </script>
 <script type="module" src="./static/essence_visualizer.js?v=idle-essence-4"></script>
-<script type="module" src="./static/home-entry.js?v=module-entry-12"></script>
+<script type="module" src="./static/home-entry.js?v=module-entry-20"></script>
 
 </head>
 
@@ -189,7 +189,7 @@ placeholder="No internal activity yet."
 
 <div class="nano-panel-toolbar">
 
-<span class="nano-panel-label">Storage snapshot</span>
+<span class="nano-panel-label">Saved timers</span>
 
 </div>
 
@@ -203,7 +203,7 @@ readonly
 
 spellcheck="false"
 
-placeholder="No storage snapshot loaded yet."
+placeholder="No saved timers yet."
 
 ></textarea>
 
@@ -372,6 +372,13 @@ max="100"
 step="1"
 value="80"
 />
+<div class="commands-voice-mode">
+<span class="voice-volume-label">Voice mode</span>
+<div class="voice-mode-toggle" role="group" aria-label="Voice mode">
+<button id="voice-mode-off" class="voice-mode-btn active" type="button" aria-pressed="true">Off</button>
+<button id="voice-mode-on" class="voice-mode-btn" type="button" aria-pressed="false">On</button>
+</div>
+</div>
 </section>
 
 <div id="commands-list" class="commands-list"></div>
@@ -387,6 +394,8 @@ value="80"
 <p id="weather-chip" class="weather-chip" hidden aria-live="polite"></p>
 
 <p id="cpu-temp-chip" class="cpu-temp-chip" hidden aria-live="polite"></p>
+
+<p id="clock-chip" class="clock-chip" aria-hidden="true"></p>
 
 <p id="nano-version" class="nano-version" aria-label="Nano version"></p>
 
