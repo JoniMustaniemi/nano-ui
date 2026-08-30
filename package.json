@@ -6,9 +6,12 @@
   "scripts": {
     "dev": "node scripts/dev-server.mjs",
     "dev:static": "npx serve .",
-    "vendor:three": "cp node_modules/three/build/three.module.min.js static/three.module.min.js"
+    "vendor:three": "cp node_modules/three/build/three.module.min.js static/three.module.min.js",
+    "validate": "python -m pytest tests/test_home.py",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
     "three": "0.160.1"
   }
 }

@@ -12,6 +12,11 @@ function applyWeather(data) {
   if (!weatherChip) {
     return;
   }
+  if (data?.display) {
+    weatherChip.textContent = data.display;
+    weatherChip.removeAttribute("hidden");
+    return;
+  }
   const temperature = data?.temperature_c;
   const condition = data?.condition;
   if (temperature == null || !condition) {

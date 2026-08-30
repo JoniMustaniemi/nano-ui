@@ -73,6 +73,8 @@ def test_weather_chip_integration() -> None:
     assert "applyWeather" in weather_js
     assert 'nanoFetch("/api/location"' in weather_js
     assert 'nanoFetch("/api/weather/current")' in weather_js
+    assert "data?.display" in weather_js
+    assert "data.display" in weather_js
     assert "initWeatherOnce" in activity_js
     assert ".weather-chip" in css_text
 
