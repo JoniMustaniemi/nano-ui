@@ -63,4 +63,24 @@ With confirmation, you can ask Nano to:
 
 ## Hosting
 
-The site is static and can be hosted anywhere. Requests are forwarded to the Raspberry Pi.
+The site is hosted on [Cloudflare Pages](https://pages.cloudflare.com/). Static files are served from the repo root, and `/api/*` requests are proxied to the Raspberry Pi by a Pages Function.
+
+### Cloudflare Pages setup
+
+1. **Workers & Pages → Create → Pages → Connect to Git** and select this repo.
+2. Build settings:
+   - Framework preset: None
+   - Build command: `HUSKY=0 pnpm install && pnpm run build`
+   - Build output directory: `.` (project root — not `/`)
+3. Environment variables (Settings → Environment variables):
+   - `NANO_API_ORIGIN` = your Pi API URL, for example `http://86.60.218.175:8000` (optional; the function falls back to this default)
+4. Deploy and verify:
+   - The site loads at `*.pages.dev`
+   - `/api/health` returns the Pi health JSON
+   - Chat, timers, and live events work
+
+Validation and linting run in GitHub Actions on push/PR. The Cloudflare build only generates `config.js` for same-origin API calls.
+
+### Local development
+
+Run `pnpm run dev` and open `http://localhost:3000`. The dev server proxies `/api/*` to your Pi and writes `config.js` automatically.
