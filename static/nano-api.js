@@ -137,6 +137,7 @@ async function waitForNano({ timeoutMs = 120_000, intervalMs = 2_000 } = {}) {
 }
 
 window.getApiBase = getApiBase;
+window.getConfiguredApiUrl = getConfiguredApiUrl;
 window.getApiKey = getApiKey;
 window.setApiConnection = setApiConnection;
 window.hasApiConnection = hasApiConnection;

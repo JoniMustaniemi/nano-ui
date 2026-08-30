@@ -1,5 +1,4 @@
 const DEFAULT_API_ORIGIN = "http://86.60.218.175:8000";
-const IP_PROXY_HOSTNAME = "nano-api.internal";
 
 function resolveApiOrigin(env) {
   const configured = (env.NANO_API_ORIGIN || DEFAULT_API_ORIGIN).trim();
@@ -18,6 +17,14 @@ function isIpAddress(hostname) {
   return hostname.startsWith("[") && hostname.endsWith("]");
 }
 
+function resolveBackendUrl(apiOrigin, incoming) {
+  const backend = new URL(`${apiOrigin}${incoming.pathname}${incoming.search}`);
+  if (isIpAddress(backend.hostname)) {
+    backend.hostname = `${backend.hostname}.nip.io`;
+  }
+  return backend;
+}
+
 function buildProxyHeaders(request, backendUrl) {
   const headers = new Headers(request.headers);
   headers.set("host", backendUrl.host);
@@ -31,22 +38,14 @@ function buildProxyHeaders(request, backendUrl) {
 export async function onRequest(context) {
   const incoming = new URL(context.request.url);
   const apiOrigin = resolveApiOrigin(context.env);
-  const backend = new URL(`${apiOrigin}${incoming.pathname}${incoming.search}`);
+  const backend = resolveBackendUrl(apiOrigin, incoming);
   const method = context.request.method;
   const hasBody = method !== "GET" && method !== "HEAD";
-  const fetchUrl = new URL(backend);
-  const fetchOptions = {
+
+  return fetch(backend, {
     method,
     headers: buildProxyHeaders(context.request, backend),
     body: hasBody ? context.request.body : undefined,
     redirect: "manual",
-  };
-
-  // Cloudflare blocks fetch() to literal IP addresses (error 1003 -> 403).
-  if (isIpAddress(backend.hostname)) {
-    fetchOptions.cf = { resolveOverride: backend.hostname };
-    fetchUrl.hostname = IP_PROXY_HOSTNAME;
-  }
-
-  return fetch(fetchUrl, fetchOptions);
+  });
 }

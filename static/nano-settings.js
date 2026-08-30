@@ -17,7 +17,7 @@ function refreshConnectionFields() {
   if (!connectionUrlInput || !connectionKeyInput) {
     return;
   }
-  connectionUrlInput.value = getApiBase();
+  connectionUrlInput.value = getConfiguredApiUrl();
   connectionKeyInput.value = getApiKey();
 }
 
