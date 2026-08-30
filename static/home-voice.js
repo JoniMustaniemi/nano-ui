@@ -170,11 +170,13 @@ const VOICE_SEGMENT_BUFFER_MS = 3500;
 const VOICE_RECOGNITION_LANG = "en-US";
 const WAKE_COMMAND_GRACE_MS = 800;
 const PENDING_VOICE_DEBOUNCE_MS = 900;
+const MOBILE_RECOGNITION_RESTART_MIN_MS = 2500;
 
 let wakeWordRecognition = null;
 let recognitionPaused = false;
 let wakeWordRestartTimer = null;
 let pendingVoiceSubmitTimer = null;
+let lastRecognitionStartAt = 0;
 let lastVoiceSubmission = { text: "", at: 0 };
 let wakeCommandArmed = false;
 let wakeCommandArmedUntil = 0;
@@ -204,6 +206,19 @@ function isCoarsePointerDevice() {
     return window.matchMedia("(pointer: coarse)").matches;
   } catch (_error) {
     return false;
+  }
+}
+
+function shouldKeepRecognitionAliveDuringSubmit() {
+  return isCoarsePointerDevice();
+}
+
+function ensureWakeWordListeningActive() {
+  if (!voiceModeEnabled || shouldPauseWakeWordListening()) {
+    return;
+  }
+  if (!wakeWordRecognition) {
+    startWakeWordRecognition();
   }
 }
 
@@ -370,6 +385,14 @@ async function flushPendingVoiceSubmit() {
   }
   clearRecentVoiceSegments();
   if (typeof submitMessage !== "function") {
+    return;
+  }
+  if (shouldKeepRecognitionAliveDuringSubmit()) {
+    try {
+      await submitMessage(message, "voice");
+    } finally {
+      ensureWakeWordListeningActive();
+    }
     return;
   }
   pauseWakeWordListening();
@@ -539,6 +562,15 @@ function scheduleWakeWordRestart(delayMs = 300) {
   if (shouldPauseWakeWordListening()) {
     return;
   }
+  if (isCoarsePointerDevice()) {
+    const sinceLastStart = Date.now() - lastRecognitionStartAt;
+    const minDelay = Math.max(delayMs, MOBILE_RECOGNITION_RESTART_MIN_MS);
+    if (sinceLastStart < MOBILE_RECOGNITION_RESTART_MIN_MS) {
+      delayMs = Math.max(minDelay, MOBILE_RECOGNITION_RESTART_MIN_MS - sinceLastStart);
+    } else {
+      delayMs = minDelay;
+    }
+  }
   wakeWordRestartTimer = window.setTimeout(() => {
     wakeWordRestartTimer = null;
     startWakeWordRecognition();
@@ -561,6 +593,7 @@ function startWakeWordRecognition() {
   recognition.lang = VOICE_RECOGNITION_LANG;
 
   recognition.onstart = () => {
+    lastRecognitionStartAt = Date.now();
     microphoneReady = true;
     if (!isVoiceStatusOverridden()) {
       setVoiceStatus(resolveVoiceModeStatusText());
@@ -606,7 +639,21 @@ function startWakeWordRecognition() {
   };
 
   recognition.onend = () => {
+    const endedRecognition = wakeWordRecognition;
     wakeWordRecognition = null;
+    if (
+      endedRecognition &&
+      isCoarsePointerDevice() &&
+      !shouldPauseWakeWordListening()
+    ) {
+      try {
+        endedRecognition.start();
+        wakeWordRecognition = endedRecognition;
+        return;
+      } catch (_error) {
+        // Fall through to a throttled fresh start.
+      }
+    }
     scheduleWakeWordRestart();
   };
 
@@ -975,7 +1022,10 @@ async function playVoiceNow(text, options = {}) {
   if ((!voiceAvailable && !forcePlayback) || !text.trim()) {
     return;
   }
-  pauseWakeWordListening();
+  const keepRecognitionDuringFetch = isCoarsePointerDevice();
+  if (!keepRecognitionDuringFetch) {
+    pauseWakeWordListening();
+  }
   clearVoiceSource();
   speakingActive = true;
   updateEssenceState();
@@ -996,6 +1046,7 @@ async function playVoiceNow(text, options = {}) {
     voiceAudio.src = currentVoiceUrl;
     applyVoiceVolume();
     await resumeVoiceAudioContext();
+    pauseWakeWordListening();
     await voiceAudio.play();
     startVoiceLevelMonitor();
     await waitForVoicePlayback();

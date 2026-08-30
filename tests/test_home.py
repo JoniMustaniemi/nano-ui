@@ -206,6 +206,9 @@ def test_browser_voice_sends_text_to_pi() -> None:
         1,
     )[0]
     assert "clearPendingVoiceBuffer" in ensure_listen_fn
+    assert "shouldKeepRecognitionAliveDuringSubmit" in voice_js
+    assert "ensureWakeWordListeningActive" in voice_js
+    assert "MOBILE_RECOGNITION_RESTART_MIN_MS" in voice_js
     assert "connectBrowserMicrophoneIfEnabled" in voice_js
     assert "fromGesture" in voice_js
     assert "ensureMicrophonePermission" not in voice_js
