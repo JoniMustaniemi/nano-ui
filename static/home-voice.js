@@ -169,19 +169,19 @@ const WAKE_FRAGMENT_PATTERN = /^(?:hey|hay|hi|nano|nanno|nana|nah no|na no)$/i;
 const VOICE_SEGMENT_BUFFER_MS = 3500;
 const VOICE_RECOGNITION_LANG = "en-US";
 const WAKE_COMMAND_GRACE_MS = 800;
-const ARMED_COMMAND_DEBOUNCE_MS = 900;
+const PENDING_VOICE_DEBOUNCE_MS = 900;
 
 let wakeWordRecognition = null;
 let recognitionPaused = false;
 let wakeWordRestartTimer = null;
-let armedCommandSubmitTimer = null;
+let pendingVoiceSubmitTimer = null;
 let lastVoiceSubmission = { text: "", at: 0 };
 let wakeCommandArmed = false;
 let wakeCommandArmedUntil = 0;
 let wakeCommandArmedAt = 0;
 let recentVoiceSegments = [];
 let lastInterimWakeCheck = { text: "", at: 0 };
-let armedCommandBuffer = "";
+let pendingVoiceBuffer = "";
 
 const VOICE_UNSUPPORTED_MESSAGE =
   "Voice commands require Chrome or Safari. This browser does not support speech recognition yet.";
@@ -208,19 +208,17 @@ function isCoarsePointerDevice() {
 }
 
 function resetWakeCommandWindow() {
-  clearArmedCommandDebounce();
-  clearArmedCommandBuffer();
   wakeCommandArmed = false;
   wakeCommandArmedUntil = 0;
   wakeCommandArmedAt = 0;
   waitingForWakeCommand = false;
 }
 
-function clearArmedCommandBuffer() {
-  armedCommandBuffer = "";
+function clearPendingVoiceBuffer() {
+  pendingVoiceBuffer = "";
 }
 
-function mergeArmedCommandTranscript(previous, next) {
+function mergeVoiceTranscript(previous, next) {
   const prev = (previous || "").trim();
   const nextText = (next || "").trim();
   if (!nextText) {
@@ -259,56 +257,131 @@ function mergeArmedCommandTranscript(previous, next) {
   return nextText.length >= prev.length ? nextText : prev;
 }
 
-function updateArmedCommandBuffer(transcript) {
-  armedCommandBuffer = mergeArmedCommandTranscript(armedCommandBuffer, transcript);
+function updatePendingVoiceBuffer(transcript) {
+  pendingVoiceBuffer = mergeVoiceTranscript(pendingVoiceBuffer, transcript);
 }
 
-function clearArmedCommandDebounce() {
-  if (armedCommandSubmitTimer !== null) {
-    window.clearTimeout(armedCommandSubmitTimer);
-    armedCommandSubmitTimer = null;
+function clearPendingVoiceSubmit() {
+  if (pendingVoiceSubmitTimer !== null) {
+    window.clearTimeout(pendingVoiceSubmitTimer);
+    pendingVoiceSubmitTimer = null;
   }
 }
 
-function scheduleArmedCommandSubmit() {
-  clearArmedCommandDebounce();
-  armedCommandSubmitTimer = window.setTimeout(() => {
-    armedCommandSubmitTimer = null;
-    void flushArmedCommandSubmit();
-  }, ARMED_COMMAND_DEBOUNCE_MS);
+function schedulePendingVoiceSubmit() {
+  clearPendingVoiceSubmit();
+  pendingVoiceSubmitTimer = window.setTimeout(() => {
+    pendingVoiceSubmitTimer = null;
+    void flushPendingVoiceSubmit();
+  }, PENDING_VOICE_DEBOUNCE_MS);
 }
 
-async function flushArmedCommandSubmit() {
-  if (!wakeCommandArmed || requestInFlight || speakingActive) {
+function extractVoiceCommandForSubmit(text) {
+  const trimmed = (text || "").trim();
+  if (!trimmed) {
+    return null;
+  }
+  const match = trimmed.match(WAKE_WORD_PATTERN);
+  if (!match) {
+    return null;
+  }
+  const command = textAfterWakeWord(trimmed, match);
+  if (!command || isWakeWordOnlyMessage(command)) {
+    return null;
+  }
+  return command;
+}
+
+function resolvePendingVoiceMessage(merged) {
+  const text = (merged || "").trim();
+  if (!text) {
+    return null;
+  }
+  if (acceptsVoiceWithoutWakeWord()) {
+    const wakeMatch = text.match(WAKE_WORD_PATTERN);
+    if (wakeMatch) {
+      return textAfterWakeWord(text, wakeMatch) || null;
+    }
+    return text;
+  }
+  if (wakeCommandArmed) {
+    return normalizeArmedVoiceCommand(text);
+  }
+  return extractVoiceCommandForSubmit(text);
+}
+
+function isWakeWordOnlyUtterance(text) {
+  const trimmed = (text || "").trim();
+  if (!trimmed) {
+    return false;
+  }
+  const match = trimmed.match(WAKE_WORD_PATTERN);
+  if (!match) {
+    return false;
+  }
+  return !textAfterWakeWord(trimmed, match);
+}
+
+function detectWakeWordOnBuffer() {
+  if (acceptsVoiceWithoutWakeWord() || wakeCommandArmed) {
     return;
   }
-  const now = Date.now();
-  if (now > wakeCommandArmedUntil) {
+  const text = pendingVoiceBuffer.trim();
+  if (!text || !isWakeWordOnlyUtterance(text)) {
+    return;
+  }
+  armWakeCommandWindow();
+  acknowledgeWakeWordOnly();
+}
+
+async function flushPendingVoiceSubmit() {
+  if (requestInFlight || speakingActive) {
+    return;
+  }
+  const merged = pendingVoiceBuffer.trim();
+  if (!merged) {
+    return;
+  }
+  if (wakeCommandArmed) {
+    const now = Date.now();
+    if (now > wakeCommandArmedUntil) {
+      resetWakeCommandWindow();
+      clearPendingVoiceBuffer();
+      return;
+    }
+    if (now - wakeCommandArmedAt < WAKE_COMMAND_GRACE_MS) {
+      return;
+    }
+  }
+  const message = resolvePendingVoiceMessage(merged);
+  if (!message) {
+    if (isWakeWordOnlyUtterance(merged)) {
+      clearPendingVoiceBuffer();
+    }
+    return;
+  }
+  if (shouldIgnoreDuplicateVoiceMessage(message)) {
+    return;
+  }
+  clearPendingVoiceSubmit();
+  clearPendingVoiceBuffer();
+  if (wakeCommandArmed) {
     resetWakeCommandWindow();
-    return;
   }
-  if (now - wakeCommandArmedAt < WAKE_COMMAND_GRACE_MS) {
-    return;
-  }
-  const command = normalizeArmedVoiceCommand(armedCommandBuffer);
-  if (!command || shouldIgnoreDuplicateVoiceMessage(command)) {
-    return;
-  }
-  resetWakeCommandWindow();
   clearRecentVoiceSegments();
   if (typeof submitMessage !== "function") {
     return;
   }
   pauseWakeWordListening();
   try {
-    await submitMessage(command, "voice");
+    await submitMessage(message, "voice");
   } finally {
     resumeWakeWordListening();
   }
 }
 
 function armWakeCommandWindow() {
-  clearArmedCommandBuffer();
+  clearPendingVoiceBuffer();
   wakeCommandArmed = true;
   wakeCommandArmedAt = Date.now();
   wakeCommandArmedUntil = wakeCommandArmedAt + WAKE_COMMAND_WINDOW_MS;
@@ -417,52 +490,6 @@ function acceptsVoiceWithoutWakeWord() {
     waitingForPresence ||
     waitingForYesNoConfirmation
   );
-}
-
-function extractVoiceCommand(transcript) {
-  const text = (transcript || "").trim();
-  if (!text) {
-    return null;
-  }
-  if (acceptsVoiceWithoutWakeWord()) {
-    resetWakeCommandWindow();
-    clearRecentVoiceSegments();
-    return text;
-  }
-
-  const now = Date.now();
-  if (wakeCommandArmed) {
-    if (now > wakeCommandArmedUntil) {
-      resetWakeCommandWindow();
-    } else {
-      return null;
-    }
-  }
-
-  for (const candidate of voiceTranscriptCandidates(text)) {
-    const match = candidate.match(WAKE_WORD_PATTERN);
-    if (!match) {
-      continue;
-    }
-    const command = textAfterWakeWord(candidate, match);
-    if (command) {
-      if (isWakeWordOnlyMessage(command)) {
-        armWakeCommandWindow();
-        acknowledgeWakeWordOnly();
-        clearRecentVoiceSegments();
-        return null;
-      }
-      resetWakeCommandWindow();
-      clearRecentVoiceSegments();
-      return command;
-    }
-    armWakeCommandWindow();
-    clearRecentVoiceSegments();
-    acknowledgeWakeWordOnly();
-    return null;
-  }
-
-  return null;
 }
 
 function shouldIgnoreDuplicateVoiceMessage(message) {
@@ -631,7 +658,7 @@ function tryInterimWakeWord(transcript) {
     if (!wakeCommandArmed) {
       armWakeCommandWindow();
       acknowledgeWakeWordOnly();
-      clearRecentVoiceSegments();
+      clearPendingVoiceBuffer();
     }
     return;
   }
@@ -639,6 +666,8 @@ function tryInterimWakeWord(transcript) {
 
 function releaseMicrophone() {
   pauseWakeWordListening();
+  clearPendingVoiceSubmit();
+  clearPendingVoiceBuffer();
   resetWakeCommandWindow();
   clearRecentVoiceSegments();
   microphoneReady = false;
@@ -681,44 +710,13 @@ async function handleVoiceTranscript(transcript) {
   if (requestInFlight || speakingActive) {
     return;
   }
-  if (wakeCommandArmed) {
-    updateArmedCommandBuffer(transcript);
-  } else {
-    pushRecentVoiceSegment(transcript);
+  updatePendingVoiceBuffer(transcript);
+  detectWakeWordOnBuffer();
+  if (wakeCommandArmed && Date.now() > wakeCommandArmedUntil) {
+    resetWakeCommandWindow();
+    clearPendingVoiceBuffer();
   }
-
-  const message = extractVoiceCommand(transcript);
-
-  if (wakeCommandArmed && !message) {
-    const now = Date.now();
-    if (now <= wakeCommandArmedUntil && now - wakeCommandArmedAt >= WAKE_COMMAND_GRACE_MS) {
-      const pendingCommand = normalizeArmedVoiceCommand(armedCommandBuffer);
-      if (pendingCommand) {
-        scheduleArmedCommandSubmit();
-      }
-    } else if (now > wakeCommandArmedUntil) {
-      resetWakeCommandWindow();
-    }
-    return;
-  }
-
-  if (!message || shouldIgnoreDuplicateVoiceMessage(message)) {
-    return;
-  }
-  if (isWakeWordOnlyMessage(message)) {
-    armWakeCommandWindow();
-    acknowledgeWakeWordOnly();
-    return;
-  }
-  if (typeof submitMessage !== "function") {
-    return;
-  }
-  pauseWakeWordListening();
-  try {
-    await submitMessage(message, "voice");
-  } finally {
-    resumeWakeWordListening();
-  }
+  schedulePendingVoiceSubmit();
 }
 
 async function setVoiceModeEnabled(enabled, { persist = true } = {}) {
@@ -1075,6 +1073,8 @@ function directAnswerListenStatus() {
 }
 
 function ensureDirectAnswerListening(statusText) {
+  clearPendingVoiceSubmit();
+  clearPendingVoiceBuffer();
   waitingForVoiceAnswer = true;
   voiceAnswerPrompt = statusText || directAnswerListenStatus();
   setVoiceStatus(voiceAnswerPrompt);
@@ -1151,6 +1151,8 @@ function returnToWakeDetection() {
   currentAnswerPendingKind = null;
   currentPendingSnapshot = null;
   currentInputKind = null;
+  clearPendingVoiceSubmit();
+  clearPendingVoiceBuffer();
   resetWakeCommandWindow();
   syncInputActions();
   if (voiceModeEnabled) {

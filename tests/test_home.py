@@ -157,7 +157,8 @@ def test_browser_voice_sends_text_to_pi() -> None:
     js_text = _load_home_js()
 
     assert "startWakeWordRecognition" in voice_js
-    assert "extractVoiceCommand" in voice_js
+    assert "extractVoiceCommandForSubmit" in voice_js
+    assert "resolvePendingVoiceMessage" in voice_js
     assert "WAKE_WORD_PATTERN" in voice_js
     assert "handleVoiceTranscript" in voice_js
     assert "connectBrowserMicrophone" in voice_js
@@ -177,12 +178,12 @@ def test_browser_voice_sends_text_to_pi() -> None:
     assert "waitingForWakeCommand" in state_js
     assert "isVoiceRecognitionSupported" in voice_js
     assert "tryInterimWakeWord" in voice_js
-    assert "scheduleArmedCommandSubmit" in voice_js
-    assert "flushArmedCommandSubmit" in voice_js
-    assert "ARMED_COMMAND_DEBOUNCE_MS" in voice_js
-    assert "mergeArmedCommandTranscript" in voice_js
-    assert "armedCommandBuffer" in voice_js
-    assert "updateArmedCommandBuffer" in voice_js
+    assert "schedulePendingVoiceSubmit" in voice_js
+    assert "flushPendingVoiceSubmit" in voice_js
+    assert "PENDING_VOICE_DEBOUNCE_MS" in voice_js
+    assert "mergeVoiceTranscript" in voice_js
+    assert "pendingVoiceBuffer" in voice_js
+    assert "updatePendingVoiceBuffer" in voice_js
     try_interim_fn = voice_js.split("function tryInterimWakeWord", 1)[1].split(
         "function releaseMicrophone",
         1,
@@ -192,8 +193,19 @@ def test_browser_voice_sends_text_to_pi() -> None:
         "async function setVoiceModeEnabled",
         1,
     )[0]
-    assert "updateArmedCommandBuffer" in handle_transcript_fn
-    assert "normalizeArmedVoiceCommand(armedCommandBuffer)" in voice_js
+    assert "updatePendingVoiceBuffer" in handle_transcript_fn
+    assert "schedulePendingVoiceSubmit" in handle_transcript_fn
+    assert "submitMessage" not in handle_transcript_fn
+    flush_fn = voice_js.split("async function flushPendingVoiceSubmit", 1)[1].split(
+        "function armWakeCommandWindow",
+        1,
+    )[0]
+    assert 'submitMessage(message, "voice")' in flush_fn
+    ensure_listen_fn = voice_js.split("function ensureDirectAnswerListening", 1)[1].split(
+        "async function enterPresenceListenMode",
+        1,
+    )[0]
+    assert "clearPendingVoiceBuffer" in ensure_listen_fn
     assert "connectBrowserMicrophoneIfEnabled" in voice_js
     assert "fromGesture" in voice_js
     assert "ensureMicrophonePermission" not in voice_js
