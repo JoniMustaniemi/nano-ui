@@ -110,7 +110,7 @@ async function loadNanoVersionFromBackend() {
 
 window.loadNanoVersionFromBackend = loadNanoVersionFromBackend;
 
-async function completeStartupAfterConnection() {
+async function initApp() {
   await loadNanoVersionFromBackend();
   void initVoiceVolumeControl();
   initVoiceModeControl();
@@ -118,6 +118,10 @@ async function completeStartupAfterConnection() {
   setVoiceStatus("Voice on standby.");
   syncVoiceListeningState();
   await bootstrap();
+}
+
+async function completeStartupAfterConnection() {
+  await initApp();
 }
 
 window.completeStartupAfterConnection = completeStartupAfterConnection;
@@ -131,12 +135,6 @@ window.addEventListener("load", () => {
     if (!connected) {
       return;
     }
-    await loadNanoVersionFromBackend();
-    void initVoiceVolumeControl();
-    initVoiceModeControl();
-    restoreBaseAnswer();
-    setVoiceStatus("Voice on standby.");
-    syncVoiceListeningState();
-    bootstrap();
+    await initApp();
   });
 });

@@ -64,10 +64,6 @@
   box-shadow: none;
 }
 
-#nano-controls-toggle {
-  position: relative;
-}
-
 /* ── Full-screen view modal ── */
 
 .view-modal {
@@ -295,8 +291,7 @@ button:disabled {
   color: var(--text);
 }
 
-body.inputs-locked .bottom-bar-btn:disabled,
-body.inputs-locked #keyboard-toggle:disabled {
+body.inputs-locked .bottom-bar-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }

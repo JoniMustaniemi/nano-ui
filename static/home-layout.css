@@ -1004,33 +1004,6 @@ body[data-display-state="working"] .activity-cursor {
   pointer-events: none;
 }
 
-/* ── Keyboard toggle ── */
-
-.keyboard-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin: 0;
-  padding: 8px 16px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--muted);
-  font: 600 0.82rem/1 "Segoe UI", system-ui, sans-serif;
-  cursor: pointer;
-  transition: color 140ms ease;
-}
-
-.keyboard-toggle svg {
-  width: 18px;
-  height: 18px;
-}
-
-.keyboard-toggle:hover {
-  color: var(--accent-soft);
-}
-
 /* ── Keyboard panel ── */
 
 .keyboard-panel {

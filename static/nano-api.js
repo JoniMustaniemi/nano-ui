@@ -56,14 +56,6 @@ function getApiBase() {
   return resolveApiBase(getConfiguredApiUrl());
 }
 
-function isCrossOriginApi() {
-  try {
-    return new URL(getApiBase()).origin !== window.location.origin;
-  } catch (_error) {
-    return true;
-  }
-}
-
 function getApiKey() {
   try {
     const stored = window.localStorage.getItem(NANO_API_KEY_KEY);
@@ -145,8 +137,6 @@ async function waitForNano({ timeoutMs = 120_000, intervalMs = 2_000 } = {}) {
 }
 
 window.getApiBase = getApiBase;
-window.getConfiguredApiUrl = getConfiguredApiUrl;
-window.isCrossOriginApi = isCrossOriginApi;
 window.getApiKey = getApiKey;
 window.setApiConnection = setApiConnection;
 window.hasApiConnection = hasApiConnection;

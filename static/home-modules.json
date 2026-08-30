@@ -1,0 +1,20 @@
+[
+  "home-dom.js",
+  "home-state.js",
+  "home-calendar.js",
+  "home-view-session.js",
+  "home-ui.js",
+  "home-voice.js",
+  "home-greeting.js",
+  "home-timer-api.js",
+  "home-stopwatches.js",
+  "home-timers.js",
+  "home-timers-display.js",
+  "home-events.js",
+  "home-metrics.js",
+  "home-activity.js",
+  "home-reconnect.js",
+  "home-chat.js",
+  "home-weather.js",
+  "home-bootstrap.js"
+]

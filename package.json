@@ -2,15 +2,18 @@
   "name": "nano-ui",
   "private": true,
   "version": "1.0.0",
-  "description": "Thin web client for Nano Core",
+  "description": "Web front end for Nano Core",
   "scripts": {
     "dev": "node scripts/dev-server.mjs",
     "dev:static": "npx serve .",
     "vendor:three": "cp node_modules/three/build/three.module.min.js static/three.module.min.js",
     "validate": "python -m pytest tests/test_home.py",
+    "lint": "eslint static/ scripts/",
     "prepare": "husky"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "eslint": "^9.39.1",
     "husky": "^9.1.7",
     "three": "0.160.1"
   }

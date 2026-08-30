@@ -136,11 +136,35 @@ async function followUpClearAllTimersOnServer() {
   }
 }
 
-async function submitMessage(message, source, commandHint, options = {}) {
+function armVoiceFollowUpIfNeeded(answerText, { inferCommandFromMessage } = {}) {
+  if (!answerNeedsVoiceFollowUp(answerText)) {
+    return false;
+  }
+  if (!pendingSystemCommandId && inferCommandFromMessage) {
+    const inferredCommandId =
+      inferSystemCommandFromMessage(inferCommandFromMessage) || inferSystemCommandFromText(answerText);
+    if (inferredCommandId) {
+      setPendingSystemCommand(inferredCommandId);
+    }
+  }
+  const isYesNoConfirmation =
+    answerNeedsYesNoConfirmation(answerText) ||
+    answerText.toLowerCase().includes("reply yes to proceed or no to cancel") ||
+    Boolean(pendingSystemCommandId);
+  const isTimerFollowUp = answerNeedsTimerDuration(answerText);
+  const followUpPrompt = isYesNoConfirmation
+    ? "Reply yes to confirm or no to cancel."
+    : 'Say your answer after "hey nano".';
+  setVoiceStatus('Say your answer after "hey nano".');
+  armVoiceFollowUp(followUpPrompt, {
+    yesNo: isYesNoConfirmation,
+    inputKind: isTimerFollowUp ? "timer_duration" : null,
+  });
+  return true;
+}
+
+function buildSubmitMessageContext(message, source, commandHint, options = {}) {
   const skipClearAllFollowUp = Boolean(options.skipClearAllFollowUp);
-  const clearAllRequested =
-    !skipClearAllFollowUp &&
-    (isClearAllTimersCommand(commandHint) || isClearAllTimersMessage(message));
   const confirmationAnswer = Boolean(commandHint?.confirmationAnswer);
   const inputAnswer = Boolean(commandHint?.inputAnswer);
   const typedConfirmationAnswer =
@@ -158,7 +182,22 @@ async function submitMessage(message, source, commandHint, options = {}) {
       currentAnswerPendingKind === "timer_duration" ||
       currentInputKind === "timer_duration");
 
-  if (isPendingInputAnswer || isVoicePendingAnswer) {
+  return {
+    clearAllRequested:
+      !skipClearAllFollowUp &&
+      (isClearAllTimersCommand(commandHint) || isClearAllTimersMessage(message)),
+    confirmationAnswer,
+    inputAnswer,
+    isConfirmationAnswer,
+    isPendingInputAnswer,
+    isVoicePendingAnswer,
+  };
+}
+
+function prepareSubmitMessageState(message, source, commandHint, context) {
+  const { isConfirmationAnswer, inputAnswer, isVoicePendingAnswer } = context;
+
+  if (context.isPendingInputAnswer || isVoicePendingAnswer) {
     suppressPendingRearm = true;
   }
 
@@ -166,6 +205,7 @@ async function submitMessage(message, source, commandHint, options = {}) {
   answerTimeoutPending = false;
   waitingForYesNoConfirmation = false;
   syncInputActions();
+
   if (isConfirmationAnswer) {
     returnToWakeDetection();
   } else if (inputAnswer || isVoicePendingAnswer) {
@@ -174,117 +214,85 @@ async function submitMessage(message, source, commandHint, options = {}) {
     currentInputKind = null;
     syncInputActions();
   }
-  if (tryHandleUiCommand(message, source)) {
-    await completeUiCommand(source);
-    return;
-  }
-  if (isViewSessionActive() && source !== "command" && source !== "voice") {
-    return;
-  }
+
   if (isSystemCommandId(commandHint?.id)) {
     setPendingSystemCommand(commandHint.id);
   }
   if (isClearAllTimersCommand(commandHint) || isClearAllTimersMessage(message)) {
     clearAllLocalTimerState();
   }
-  showUserSpeech(message);
-  requestInFlight = true;
-  if (!isPendingInputAnswer) {
-    await acknowledgeRequest(source, commandHint);
-  }
+}
+
+async function sendChatRequest(message, source) {
   replyStatus.textContent = source === "voice" ? "Sending voice command..." : "Sending...";
-  let answerText = "";
-  let shouldSpeak = true;
-  let requestFailed = false;
-  try {
-    const response = await nanoFetch("/api/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        message,
-        mode: "agent",
-      }),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.detail || "Chat request failed.");
-    }
-    answerText = resolveSystemCommandConfirmation(data.content, message);
-    shouldSpeak = data.speak !== false;
-    setAnswer(answerText, { deferClearUntilSpeech: shouldSpeak, allowDuringWorking: true });
-    replyStatus.textContent = "";
-    await refreshStorage();
-  } catch (error) {
-    requestFailed = true;
-    replyStatus.textContent = error.message;
-    returnToWakeDetection();
-    if (isPendingInputAnswer) {
-      suppressPendingRearm = false;
-    }
-  } finally {
-    requestInFlight = false;
-    if (!reconnectInProgress) {
-      await syncRuntimeStatus();
-      if (clearAllRequested) {
-        await followUpClearAllTimersOnServer();
-      }
-      if (isConfirmationAnswer) {
-        returnToWakeDetection();
-      }
-    }
+  const response = await nanoFetch("/api/chat", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      message,
+      mode: "agent",
+    }),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.detail || "Chat request failed.");
   }
+  return {
+    answerText: resolveSystemCommandConfirmation(data.content, message),
+    shouldSpeak: data.speak !== false,
+  };
+}
 
-  if (requestFailed || !answerText) {
+async function finalizeChatRequest(context) {
+  requestInFlight = false;
+  if (reconnectInProgress) {
     return;
   }
+  await syncRuntimeStatus();
+  if (context.clearAllRequested) {
+    await followUpClearAllTimersOnServer();
+  }
+  if (context.isConfirmationAnswer) {
+    returnToWakeDetection();
+  }
+}
 
+async function handleChatSystemCommand(answerText, shouldSpeak) {
   const systemResponse = handleSystemCommandResponse(answerText);
-  if (systemResponse.handled) {
-    if (systemResponse.reconnect) {
-      returnToWakeDetection();
-      if (shouldSpeak) {
-        await playVoice(answerText);
-      }
-      void beginNanoReconnect(systemResponse.kind);
-      return;
-    }
-    if (shouldSpeak) {
-      await playVoice(answerText);
-    }
+  if (!systemResponse.handled) {
+    return false;
+  }
+  if (systemResponse.reconnect) {
     returnToWakeDetection();
-    return;
-  }
-
-  if (isConfirmationAnswer) {
-    resetStandbySnapshot();
     if (shouldSpeak) {
       await playVoice(answerText);
     }
-    suppressPendingRearm = false;
-    return;
+    void beginNanoReconnect(systemResponse.kind);
+    return true;
   }
+  if (shouldSpeak) {
+    await playVoice(answerText);
+  }
+  returnToWakeDetection();
+  return true;
+}
 
+async function handleChatConfirmation(answerText, shouldSpeak) {
+  resetStandbySnapshot();
+  if (shouldSpeak) {
+    await playVoice(answerText);
+  }
+  suppressPendingRearm = false;
+}
+
+async function handleChatVoiceFollowUp(answerText, shouldSpeak, message) {
   if (isWaitingForUserAnswer()) {
     if (shouldSpeak) {
       await playVoice(answerText);
     }
-    if (answerNeedsVoiceFollowUp(answerText)) {
-      const isYesNoConfirmation =
-        answerNeedsYesNoConfirmation(answerText) ||
-        answerText.toLowerCase().includes("reply yes to proceed or no to cancel") ||
-        Boolean(pendingSystemCommandId);
-      const isTimerFollowUp = answerNeedsTimerDuration(answerText);
-      const followUpPrompt = isYesNoConfirmation
-        ? "Reply yes to confirm or no to cancel."
-        : 'Say your answer after "hey nano".';
-      setVoiceStatus('Say your answer after "hey nano".');
-      armVoiceFollowUp(followUpPrompt, {
-        yesNo: isYesNoConfirmation,
-        inputKind: isTimerFollowUp ? "timer_duration" : null,
-      });
-    } else {
+    if (!armVoiceFollowUpIfNeeded(answerText)) {
       returnToWakeDetection();
     }
     suppressPendingRearm = false;
@@ -296,34 +304,68 @@ async function submitMessage(message, source, commandHint, options = {}) {
     return;
   }
 
-  const needsVoiceFollowUp = answerNeedsVoiceFollowUp(answerText);
-  if (needsVoiceFollowUp) {
-    if (!pendingSystemCommandId) {
-      const inferredCommandId =
-        inferSystemCommandFromMessage(message) || inferSystemCommandFromText(answerText);
-      if (inferredCommandId) {
-        setPendingSystemCommand(inferredCommandId);
-      }
-    }
-    const isYesNoConfirmation =
-      answerNeedsYesNoConfirmation(answerText) ||
-      answerText.toLowerCase().includes("reply yes to proceed or no to cancel") ||
-      Boolean(pendingSystemCommandId);
-    const isTimerFollowUp = answerNeedsTimerDuration(answerText);
-    const followUpPrompt = isYesNoConfirmation
-      ? "Reply yes to confirm or no to cancel."
-      : 'Say your answer after "hey nano".';
-    setVoiceStatus('Say your answer after "hey nano".');
+  if (armVoiceFollowUpIfNeeded(answerText, { inferCommandFromMessage: message })) {
     await playVoice(answerText);
-    armVoiceFollowUp(followUpPrompt, {
-      yesNo: isYesNoConfirmation,
-      inputKind: isTimerFollowUp ? "timer_duration" : null,
-    });
     return;
   }
 
   await playVoice(answerText);
   returnToWakeDetection();
+}
+
+async function submitMessage(message, source, commandHint, options = {}) {
+  const context = buildSubmitMessageContext(message, source, commandHint, options);
+  prepareSubmitMessageState(message, source, commandHint, context);
+
+  if (tryHandleUiCommand(message, source)) {
+    await completeUiCommand(source);
+    return;
+  }
+  if (isViewSessionActive() && source !== "command" && source !== "voice") {
+    return;
+  }
+
+  showUserSpeech(message);
+  requestInFlight = true;
+  if (!context.isPendingInputAnswer) {
+    await acknowledgeRequest(source, commandHint);
+  }
+
+  let answerText = "";
+  let shouldSpeak = true;
+  let requestFailed = false;
+  try {
+    const result = await sendChatRequest(message, source);
+    answerText = result.answerText;
+    shouldSpeak = result.shouldSpeak;
+    setAnswer(answerText, { deferClearUntilSpeech: shouldSpeak, allowDuringWorking: true });
+    replyStatus.textContent = "";
+    await refreshStorage();
+  } catch (error) {
+    requestFailed = true;
+    replyStatus.textContent = error.message;
+    returnToWakeDetection();
+    if (context.isPendingInputAnswer) {
+      suppressPendingRearm = false;
+    }
+  } finally {
+    await finalizeChatRequest(context);
+  }
+
+  if (requestFailed || !answerText) {
+    return;
+  }
+
+  if (await handleChatSystemCommand(answerText, shouldSpeak)) {
+    return;
+  }
+
+  if (context.isConfirmationAnswer) {
+    await handleChatConfirmation(answerText, shouldSpeak);
+    return;
+  }
+
+  await handleChatVoiceFollowUp(answerText, shouldSpeak, message);
 }
 
 async function stopActiveStopwatch(timer) {

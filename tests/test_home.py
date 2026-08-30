@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import re
 
@@ -5,17 +6,8 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 STATIC_DIR = ROOT_DIR / "static"
 INDEX_PATH = ROOT_DIR / "index.html"
 
-HOME_JS_MODULES = (
-    "home-state.js",
-    "home-calendar.js",
-    "home-view-session.js",
-    "home-ui.js",
-    "home-voice.js",
-    "home-activity.js",
-    "home-reconnect.js",
-    "home-chat.js",
-    "home-weather.js",
-    "home-bootstrap.js",
+HOME_JS_MODULES = tuple(
+    json.loads((STATIC_DIR / "home-modules.json").read_text(encoding="utf-8"))
 )
 
 
@@ -33,6 +25,16 @@ def _load_home_css() -> str:
 
 def _load_index_html() -> str:
     return INDEX_PATH.read_text(encoding="utf-8")
+
+
+def test_home_modules_manifest_matches_entry_loader() -> None:
+    entry_js = (STATIC_DIR / "home-entry.js").read_text(encoding="utf-8")
+    manifest_modules = list(HOME_JS_MODULES)
+
+    assert 'import homeModules from "./home-modules.json"' not in entry_js
+    assert "home-modules.json" in entry_js
+    assert manifest_modules[0] == "home-dom.js"
+    assert manifest_modules[-1] == "home-bootstrap.js"
 
 
 def test_homepage_shows_standby_ui() -> None:
@@ -65,11 +67,11 @@ def test_homepage_shows_standby_ui() -> None:
 def test_clock_chip_integration() -> None:
     html_text = _load_index_html()
     bootstrap_js = (STATIC_DIR / "home-bootstrap.js").read_text(encoding="utf-8")
-    state_js = (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
+    dom_js = (STATIC_DIR / "home-dom.js").read_text(encoding="utf-8")
     css_text = _load_home_css()
 
     assert 'id="clock-chip"' in html_text
-    assert "clockChip" in state_js
+    assert "clockChip" in dom_js
     assert "startClockChip" in bootstrap_js
     assert "formatClockTime" in bootstrap_js
     assert ".clock-chip" in css_text
@@ -79,11 +81,11 @@ def test_weather_chip_integration() -> None:
     html_text = _load_index_html()
     weather_js = (STATIC_DIR / "home-weather.js").read_text(encoding="utf-8")
     activity_js = (STATIC_DIR / "home-activity.js").read_text(encoding="utf-8")
-    state_js = (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
+    dom_js = (STATIC_DIR / "home-dom.js").read_text(encoding="utf-8")
     css_text = _load_home_css()
 
     assert 'id="weather-chip"' in html_text
-    assert "weatherChip" in state_js
+    assert "weatherChip" in dom_js
     assert "initWeatherOnce" in weather_js
     assert "applyWeather" in weather_js
     assert 'nanoFetch("/api/location"' in weather_js
@@ -96,18 +98,20 @@ def test_weather_chip_integration() -> None:
 
 def test_cpu_temperature_footer_integration() -> None:
     html_text = _load_index_html()
+    metrics_js = (STATIC_DIR / "home-metrics.js").read_text(encoding="utf-8")
     activity_js = (STATIC_DIR / "home-activity.js").read_text(encoding="utf-8")
-    state_js = (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
+    dom_js = (STATIC_DIR / "home-dom.js").read_text(encoding="utf-8")
     css_text = _load_home_css()
 
     assert 'id="cpu-temp-chip"' in html_text
-    assert "cpuTempChip" in state_js
-    assert "applySystemMetrics" in activity_js
-    assert "cpu_temperature_celsius" in activity_js
-    assert "SYSTEM_METRICS_POLL_MS" in activity_js
-    assert "syncSystemMetrics" in activity_js
+    assert "cpuTempChip" in dom_js
+    assert "applySystemMetrics" in metrics_js
+    assert "cpu_temperature_celsius" in metrics_js
+    assert "SYSTEM_METRICS_POLL_MS" in metrics_js
+    assert "syncSystemMetrics" in metrics_js
+    assert "startSystemMetricsPolling" in metrics_js
+    assert 'nanoFetch("/api/system/metrics")' in metrics_js
     assert "startSystemMetricsPolling" in activity_js
-    assert 'nanoFetch("/api/system/metrics")' in activity_js
     assert ".cpu-temp-chip" in css_text
     assert ".cpu-temp-chip--warm" in css_text
     assert ".cpu-temp-chip--hot" in css_text
@@ -120,7 +124,7 @@ def test_favicon_asset_exists() -> None:
 
 
 def test_homepage_uses_remote_api_client() -> None:
-    js_text = _load_home_js()
+    activity_js = _load_home_js()
     css_text = _load_home_css()
     html_text = _load_index_html()
 
@@ -132,21 +136,21 @@ def test_homepage_uses_remote_api_client() -> None:
     assert "three.min.js" not in html_text
     assert "./static/home-entry.js" in html_text
     assert "./config.js" in html_text
-    assert "nanoFetch" in js_text
-    assert "nanoEventSource" in js_text
-    assert "ensureApiConnection" in js_text
-    assert "handleVoiceTranscript" in js_text
+    assert "nanoFetch" in activity_js
+    assert "nanoEventSource" in activity_js
+    assert "ensureApiConnection" in activity_js
+    assert "handleVoiceTranscript" in activity_js
     assert 'id="commands-toggle"' in html_text
     assert ".user-speech" in css_text
 
 
 def test_ui_does_not_run_legacy_wake_loop() -> None:
-    js_text = _load_home_js()
+    activity_js = _load_home_js()
 
-    assert "extractWakeCommand" not in js_text
-    assert "pauseRecognitionForSpeech" not in js_text
-    assert "listeningEnabled" not in js_text
-    assert "wakeAcknowledging" not in js_text
+    assert "extractWakeCommand" not in activity_js
+    assert "pauseRecognitionForSpeech" not in activity_js
+    assert "listeningEnabled" not in activity_js
+    assert "wakeAcknowledging" not in activity_js
 
 
 def test_browser_voice_sends_text_to_pi() -> None:
@@ -154,7 +158,8 @@ def test_browser_voice_sends_text_to_pi() -> None:
     activity_js = (STATIC_DIR / "home-activity.js").read_text(encoding="utf-8")
     chat_js = (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
     state_js = (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
-    js_text = _load_home_js()
+    dom_js = (STATIC_DIR / "home-dom.js").read_text(encoding="utf-8")
+    activity_js = _load_home_js()
 
     assert "startWakeWordRecognition" in voice_js
     assert "extractVoiceCommandForSubmit" in voice_js
@@ -164,7 +169,7 @@ def test_browser_voice_sends_text_to_pi() -> None:
     assert "connectBrowserMicrophone" in voice_js
     assert 'nanoFetch("/api/voice/transcribe"' not in voice_js
     assert 'nanoFetch("/api/voice/mode"' not in voice_js
-    assert 'nanoFetch("/api/voice/command"' not in js_text
+    assert 'nanoFetch("/api/voice/command"' not in activity_js
     assert 'submitMessage(message, "voice")' in voice_js
     assert "SpeechRecognition" in voice_js
     assert "recognition.continuous = true" in voice_js
@@ -213,7 +218,7 @@ def test_browser_voice_sends_text_to_pi() -> None:
     assert "fromGesture" in voice_js
     assert "ensureMicrophonePermission" not in voice_js
     assert "getUserMedia" not in voice_js
-    assert 'source !== "voice"' in chat_js.split("isViewSessionActive()", 1)[1].split("if (isSystemCommandId", 1)[0]
+    assert 'source !== "voice"' in chat_js.split("async function submitMessage", 1)[1].split("if (isSystemCommandId", 1)[0]
 
 
 def test_voice_volume_loads_from_server() -> None:
@@ -279,7 +284,7 @@ def test_task_start_acknowledgment() -> None:
 
 
 def test_reboot_restart_reconnect_helpers() -> None:
-    js_text = _load_home_js()
+    activity_js = _load_home_js()
     reconnect_js = (STATIC_DIR / "home-reconnect.js").read_text(encoding="utf-8")
     api_js = (STATIC_DIR / "nano-api.js").read_text(encoding="utf-8")
     voice_js = (STATIC_DIR / "home-voice.js").read_text(encoding="utf-8")
@@ -293,9 +298,10 @@ def test_reboot_restart_reconnect_helpers() -> None:
     assert "restart_nano" in reconnect_js
     assert "answerNeedsYesNoConfirmation" in voice_js
     assert "handleSystemCommandResponse" in reconnect_js
-    assert "home-reconnect.js" in entry_js
-    assert "reconnectInProgress" in js_text
-    assert "pendingSystemCommandId" in js_text
+    assert "home-modules.json" in entry_js
+    assert "home-reconnect.js" in (STATIC_DIR / "home-modules.json").read_text(encoding="utf-8")
+    assert "reconnectInProgress" in activity_js
+    assert "pendingSystemCommandId" in activity_js
     assert "reboot_confirmation" not in voice_js
     assert "restart_confirmation" not in voice_js
     assert "pickSystemCommandConfirmation" in reconnect_js
@@ -308,14 +314,14 @@ def test_reboot_restart_reconnect_helpers() -> None:
 
 
 def test_improvement_plans_removed() -> None:
-    js_text = _load_home_js()
+    activity_js = _load_home_js()
     html_text = _load_index_html()
     css_text = _load_home_css()
 
     assert not (STATIC_DIR / "home-plans.js").exists()
     assert "home-plans.js" not in (STATIC_DIR / "home-entry.js").read_text(encoding="utf-8")
-    assert "improvement-plans" not in js_text
-    assert "loadPlans" not in js_text
+    assert "improvement-plans" not in activity_js
+    assert "loadPlans" not in activity_js
     assert "nano-panel-plans" not in html_text
     assert ".plan-card" not in css_text
 
@@ -323,7 +329,7 @@ def test_improvement_plans_removed() -> None:
 def test_confirmation_answer_clears_waiting_state() -> None:
     chat_js = (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
     voice_js = (STATIC_DIR / "home-voice.js").read_text(encoding="utf-8")
-    activity_js = (STATIC_DIR / "home-activity.js").read_text(encoding="utf-8")
+    greeting_js = (STATIC_DIR / "home-greeting.js").read_text(encoding="utf-8")
 
     assert 'confirmationAnswer: true' in chat_js
     assert "inputAnswer: true" in chat_js
@@ -332,7 +338,7 @@ def test_confirmation_answer_clears_waiting_state() -> None:
     assert "resetStandbySnapshot()" in chat_js
     assert "returnToWakeDetection()" in chat_js
     assert "renderState();" in voice_js.split("function returnToWakeDetection()")[1]
-    assert "suppressPendingRearm" in activity_js
+    assert "suppressPendingRearm" in greeting_js
 
 
 def test_pending_input_actions() -> None:
@@ -357,18 +363,22 @@ def test_pending_input_actions() -> None:
 
 def test_voice_pending_answer_clears_waiting_state() -> None:
     chat_js = (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
-    activity_js = (STATIC_DIR / "home-activity.js").read_text(encoding="utf-8")
+    greeting_js = (STATIC_DIR / "home-greeting.js").read_text(encoding="utf-8")
 
     submit_fn = chat_js.split("async function submitMessage", 1)[1].split("async function stopActiveStopwatch", 1)[0]
-    assert "isVoicePendingAnswer" in submit_fn
-    assert "returnToWakeDetection();" in submit_fn.split("if (isWaitingForUserAnswer())", 1)[1]
-    assert "ensureDirectAnswerListening();" not in submit_fn.split("if (isWaitingForUserAnswer())", 1)[1].split(
+    context_fn = chat_js.split("function buildSubmitMessageContext", 1)[1].split("function prepareSubmitMessageState", 1)[0]
+    assert "isVoicePendingAnswer" in context_fn
+    follow_up_fn = chat_js.split("async function handleChatVoiceFollowUp", 1)[1].split("async function submitMessage", 1)[0]
+    assert "returnToWakeDetection();" in follow_up_fn.split("if (isWaitingForUserAnswer())", 1)[1]
+    assert "ensureDirectAnswerListening();" not in follow_up_fn.split("if (isWaitingForUserAnswer())", 1)[1].split(
         "if (!shouldSpeak)", 1
     )[0]
 
-    pending_fn = activity_js.split("function applyPendingSnapshot", 1)[1].split("function applyStatusSnapshot", 1)[0]
-    assert "waitingForVoiceAnswer = false" in pending_fn
-    assert "currentInputKind = null" in pending_fn
+    pending_fn = greeting_js.split("function applyPendingSnapshot", 1)[1]
+    clear_pending_fn = greeting_js.split("function clearPendingState", 1)[1].split("function applyPendingSnapshot", 1)[0]
+    assert "waitingForVoiceAnswer = false" in clear_pending_fn
+    assert "clearPendingState();" in pending_fn
+    assert "currentInputKind = null" in clear_pending_fn
 
 
 def test_timer_tool_command_helpers() -> None:
@@ -387,7 +397,7 @@ def test_timer_tool_command_helpers() -> None:
 
 
 def test_clear_all_timers() -> None:
-    activity_js = (STATIC_DIR / "home-activity.js").read_text(encoding="utf-8")
+    activity_js = _load_home_js()
     chat_js = (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
     ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
 
@@ -411,14 +421,14 @@ def test_clear_all_timers() -> None:
 
 def test_active_timer_ui() -> None:
     html_text = _load_index_html()
-    activity_js = (STATIC_DIR / "home-activity.js").read_text(encoding="utf-8")
+    activity_js = _load_home_js()
     chat_js = (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
     css_text = _load_home_css()
 
     assert 'id="active-timers"' in html_text
     assert 'id="active-stopwatches"' in html_text
     assert html_text.index('id="active-timers"') < html_text.index('id="active-stopwatches"') < html_text.index('class="essence-zone"')
-    assert "activeStopwatchesRoot" in (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
+    assert "activeStopwatchesRoot" in (STATIC_DIR / "home-dom.js").read_text(encoding="utf-8")
     assert "active-timer-item--hero" in activity_js
     assert "active-timer-progress-fill" in activity_js
     assert "getTimerProgress" in activity_js
@@ -503,7 +513,7 @@ def test_active_timer_ui() -> None:
 
 
 def test_timer_rename_ui() -> None:
-    activity_js = (STATIC_DIR / "home-activity.js").read_text(encoding="utf-8")
+    activity_js = _load_home_js()
     chat_js = (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
     css_text = _load_home_css()
 
@@ -528,7 +538,7 @@ def test_timer_rename_ui() -> None:
     assert "waitForServerTimerLabel" in chat_js
     assert "data.content" in chat_js
     assert "isCrossOriginApi()" not in chat_js
-    assert "isCrossOriginApi" in (STATIC_DIR / "nano-api.js").read_text(encoding="utf-8")
+    assert "isCrossOriginApi" not in (STATIC_DIR / "nano-api.js").read_text(encoding="utf-8")
     assert "postTimerCommand" not in chat_js
     assert "submitMessage(buildRenameTimerMessage" not in chat_js
     assert "submitMessage(buildRenameStopwatchMessage" not in chat_js
@@ -608,7 +618,7 @@ def test_hidden_tool_commands_ui_removed() -> None:
 
 def test_saved_timers_panel_uses_runtime_state() -> None:
     html_text = _load_index_html()
-    activity_js = (STATIC_DIR / "home-activity.js").read_text(encoding="utf-8")
+    activity_js = _load_home_js()
     view_session_js = (STATIC_DIR / "home-view-session.js").read_text(encoding="utf-8")
 
     assert "Saved timers" in html_text
@@ -624,7 +634,7 @@ def test_voice_mode_is_ui_toggle_only() -> None:
     voice_js = (STATIC_DIR / "home-voice.js").read_text(encoding="utf-8")
     state_js = (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
     html_text = _load_index_html()
-    js_text = _load_home_js()
+    activity_js = _load_home_js()
 
     waiting_fn = ui_js.split("function isWaitingForUserAnswer()", 1)[1].split("function isWaitingForAnswerActivity", 1)[0]
     assert "isListeningStateActive()" not in waiting_fn
@@ -642,6 +652,7 @@ def test_voice_mode_toggle_integration() -> None:
     html_text = _load_index_html()
     voice_js = (STATIC_DIR / "home-voice.js").read_text(encoding="utf-8")
     ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+    dom_js = (STATIC_DIR / "home-dom.js").read_text(encoding="utf-8")
     state_js = (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
     bootstrap_js = (STATIC_DIR / "home-bootstrap.js").read_text(encoding="utf-8")
     css_text = _load_home_css()
@@ -649,7 +660,7 @@ def test_voice_mode_toggle_integration() -> None:
     assert 'id="voice-mode-on"' in html_text
     assert 'id="voice-mode-off"' in html_text
     assert 'id="voice-support-notice"' in html_text
-    assert "voiceSupportNotice" in state_js
+    assert "voiceSupportNotice" in dom_js
     assert "voiceModeEnabled" in state_js
     assert "VOICE_MODE_STORAGE_KEY" in state_js
     assert "setVoiceModeEnabled" in voice_js

@@ -21,6 +21,14 @@ function refreshConnectionFields() {
   connectionKeyInput.value = getApiKey();
 }
 
+async function checkApiHealth() {
+  const response = await nanoFetch("/api/health");
+  if (!response.ok) {
+    throw new Error(`Health check failed (${response.status}).`);
+  }
+  return response.json();
+}
+
 function initConnectionSettings() {
   if (!connectionUrlInput || !connectionKeyInput) {
     return;
@@ -41,11 +49,7 @@ function initConnectionSettings() {
         connectionStatus.textContent = "Testing connection...";
       }
       try {
-        const response = await nanoFetch("/api/health");
-        if (!response.ok) {
-          throw new Error(`Health check failed (${response.status}).`);
-        }
-        const payload = await response.json();
+        const payload = await checkApiHealth();
         if (connectionStatus) {
           connectionStatus.textContent = `Connected to ${payload.app} (${payload.status}).`;
         }
@@ -199,11 +203,9 @@ function startConnectionPoll() {
     while (!aborted) {
       if (hasApiConnection()) {
         try {
-          const response = await nanoFetch("/api/health");
-          if (response.ok) {
-            await handleConnectionSuccess();
-            return;
-          }
+          await checkApiHealth();
+          await handleConnectionSuccess();
+          return;
         } catch (_error) {
           // Keep polling until timeout or success.
         }
@@ -236,10 +238,8 @@ async function openConnectionSettings() {
 async function ensureApiConnection() {
   if (hasApiConnection()) {
     try {
-      const response = await nanoFetch("/api/health");
-      if (response.ok) {
-        return true;
-      }
+      await checkApiHealth();
+      return true;
     } catch (_error) {
       // Fall through to waiting overlay.
     }

@@ -89,12 +89,6 @@ function setViewModalExpanded(expanded) {
       expanded && activeView === "commands" ? "true" : "false"
     );
   }
-  if (nanoControlsToggle) {
-    nanoControlsToggle.setAttribute(
-      "aria-expanded",
-      expanded && activeView === "brains" ? "true" : "false"
-    );
-  }
 }
 
 function prepareViewSwitch(fromView) {

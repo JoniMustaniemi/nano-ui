@@ -1,5 +1,5 @@
 [build]
-  command = "node -e \"require('fs').writeFileSync('config.js', 'window.NANO_DEFAULT_API_URL = \\\"\\\";\\nwindow.NANO_DEFAULT_API_KEY = \\\"\\\";\\n')\""
+  command = "pnpm install && pnpm validate && node -e \"require('fs').writeFileSync('config.js', 'window.NANO_DEFAULT_API_URL = \\\"\\\";\\nwindow.NANO_DEFAULT_API_KEY = \\\"\\\";\\n')\""
   publish = "."
 
 [[redirects]]

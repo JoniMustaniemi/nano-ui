@@ -288,12 +288,6 @@ function updateInputLock() {
   messageBox.disabled = locked;
   sendButton.disabled = locked;
   commandsToggle.disabled = locked;
-  if (nanoControlsToggle) {
-    nanoControlsToggle.disabled = locked;
-  }
-  if (keyboardToggle) {
-    keyboardToggle.disabled = locked;
-  }
   if (voiceModeOnBtn) {
     const voiceSupported =
       typeof isVoiceRecognitionSupported === "function"
@@ -1164,9 +1158,6 @@ function openKeyboardPanel() {
   keyboardOpen = true;
   keyboardPanel.hidden = false;
   document.body.classList.add("keyboard-open");
-  if (keyboardToggle) {
-    keyboardToggle.querySelector("span").textContent = "Use Voice";
-  }
   messageBox.focus();
 }
 
@@ -1174,17 +1165,6 @@ function closeKeyboardPanel() {
   keyboardOpen = false;
   document.body.classList.remove("keyboard-open");
   keyboardPanel.hidden = true;
-  if (keyboardToggle) {
-    keyboardToggle.querySelector("span").textContent = "Use Keyboard";
-  }
-}
-
-function toggleKeyboardPanel() {
-  if (keyboardOpen) {
-    closeKeyboardPanel();
-  } else {
-    openKeyboardPanel();
-  }
 }
 
 function cancelAnswerReveal() {
