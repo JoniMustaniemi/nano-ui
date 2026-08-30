@@ -126,7 +126,7 @@ async function completeStartupAfterConnection() {
 
 window.completeStartupAfterConnection = completeStartupAfterConnection;
 
-window.addEventListener("load", () => {
+function startNanoApp() {
   startClockChip();
   requestAnimationFrame(async () => {
     initEssence();
@@ -137,4 +137,10 @@ window.addEventListener("load", () => {
     }
     await initApp();
   });
-});
+}
+
+if (document.readyState === "complete") {
+  startNanoApp();
+} else {
+  window.addEventListener("load", startNanoApp, { once: true });
+}
