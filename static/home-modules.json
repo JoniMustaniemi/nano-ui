@@ -9,6 +9,7 @@
   "home-debug.js",
   "home-voice.js",
   "home-greeting.js",
+  "home-boot.js",
   "home-timer-api.js",
   "home-stopwatches.js",
   "home-timers.js",

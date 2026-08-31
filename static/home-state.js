@@ -92,6 +92,10 @@ let pendingSystemCommandId = null;
 let currentPendingSnapshot = null;
 let currentInputKind = null;
 let reconnectInProgress = false;
+let connectionOverlayMode = null;
+let connectionRecoveryStartedAt = 0;
+let rebootPendingFromStatus = false;
+const LAST_BOOT_ID_KEY = "nano_last_boot_id";
 
 // Copy and display constants
 const activityStates = ["standby", "working", "error"];

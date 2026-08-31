@@ -36,6 +36,7 @@ async function syncRuntimeStatus() {
   try {
     const snapshot = await loadSnapshot();
     applyStatusSnapshot(snapshot);
+    await syncBootState(snapshot);
   } catch (error) {
     syncTaskWaitTimer(null);
     syncActiveTimers([]);
@@ -55,6 +56,7 @@ async function bootstrap() {
   try {
     const snapshot = await loadSnapshot();
     applyStatusSnapshot(snapshot);
+    await syncBootState(snapshot);
     refreshEvents(snapshot);
     if (typeof fetchVoiceStatus === "function") {
       await fetchVoiceStatus();
@@ -62,8 +64,6 @@ async function bootstrap() {
     applyVoiceVolume();
     await loadAndRenderToolCommands();
     await connectBrowserMicrophoneIfEnabled();
-    const bootEvent = findLatestBootEvent(snapshot);
-    void refreshStandbyGreeting({ speakOnce: true, bootEvent });
     const lastEventId = Array.isArray(snapshot.events)
       ? snapshot.events.reduce((maxId, event) => {
           const eventId = Number(event?.id || 0);

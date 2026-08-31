@@ -10,8 +10,8 @@ function updateEssenceState() {
   if (speakingActive) {
     state = "speaking";
   }
-  if (stateLine.textContent === "reconnecting") {
-    state = "reconnecting";
+  if (stateLine.textContent === "reconnecting" || reconnectInProgress) {
+    state = connectionOverlayMode === "rebooting" ? "rebooting" : "reconnecting";
   }
   if (mainEssence) {
     mainEssence.setState(state);
@@ -1290,8 +1290,10 @@ function stopWorkingResponse({ restore = true } = {}) {
 }
 
 function renderState() {
-  const displayState = getDisplayState();
-  stateLine.textContent = displayState;
+  const displayState = reconnectInProgress ? "reconnecting" : getDisplayState();
+  if (!reconnectInProgress) {
+    stateLine.textContent = displayState;
+  }
   document.body.dataset.displayState = displayState;
   applyControlsVisibility();
   renderActivityStatus();

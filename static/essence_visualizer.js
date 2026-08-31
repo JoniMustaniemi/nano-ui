@@ -36,6 +36,13 @@ const ESSENCE_STATES = {
     spread: 0.75,
     core: 0.35,
   },
+  rebooting: {
+    speed: 0.22,
+    breathe: 0.42,
+    glow: 0.55,
+    spread: 0.88,
+    core: 0.62,
+  },
 };
 
 const STATE_COLORS = {
@@ -63,6 +70,11 @@ const STATE_COLORS = {
     primary: [0.08, 0.1, 0.09],
     secondary: [0.28, 0.38, 0.32],
     accent: [0.42, 0.5, 0.44],
+  },
+  rebooting: {
+    primary: [0.12, 0.08, 0.04],
+    secondary: [0.92, 0.58, 0.14],
+    accent: [1.0, 0.78, 0.32],
   },
 };
 

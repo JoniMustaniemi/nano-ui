@@ -77,7 +77,9 @@ async function handleConnectionSuccess() {
   if (typeof stateLine !== "undefined" && stateLine) {
     stateLine.textContent = "standby";
   }
-  if (typeof updateEssenceState === "function") {
+  if (typeof renderState === "function") {
+    renderState();
+  } else if (typeof updateEssenceState === "function") {
     updateEssenceState();
   }
 
@@ -91,30 +93,12 @@ async function handleConnectionSuccess() {
   }
 }
 
-function ensureWaitingOverlay() {
-  let overlay = document.getElementById("nano-waiting-overlay");
-  if (overlay) {
-    return overlay;
-  }
-
-  overlay = document.createElement("section");
-  overlay.id = "nano-waiting-overlay";
-  overlay.className = "nano-waiting-overlay";
-  overlay.hidden = true;
-  overlay.innerHTML = `
-    <div class="nano-waiting-content" role="status" aria-live="polite">
-      <h2 class="nano-waiting-headline">Waiting for Nano...</h2>
-      <p id="nano-waiting-detail" class="nano-waiting-detail"></p>
-      <p id="nano-waiting-status" class="nano-waiting-status">Checking connection</p>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-
-  return overlay;
-}
-
 function setWaitingDetail(text) {
-  const detail = document.getElementById("nano-waiting-detail");
+  if (typeof updateConnectionOverlayDetail === "function") {
+    updateConnectionOverlayDetail(text);
+    return;
+  }
+  const detail = document.getElementById("nano-connection-detail");
   if (!detail) {
     return;
   }
@@ -122,7 +106,7 @@ function setWaitingDetail(text) {
 }
 
 function rotateWaitingMessage() {
-  const detail = document.getElementById("nano-waiting-detail");
+  const detail = document.getElementById("nano-connection-detail");
   if (!detail) {
     return;
   }
@@ -150,37 +134,34 @@ function stopWaitingMessageRotation() {
 }
 
 function updateWaitingStatus(attempt) {
-  const status = document.getElementById("nano-waiting-status");
-  if (!status) {
+  const statusText =
+    attempt <= 1 ? "Checking connection" : "Still waiting — retrying";
+  if (typeof updateConnectionOverlayStatus === "function") {
+    updateConnectionOverlayStatus(statusText);
     return;
   }
-  status.textContent =
-    attempt <= 1 ? "Checking connection" : "Still waiting — retrying";
+  const status = document.getElementById("nano-connection-status");
+  if (status) {
+    status.textContent = statusText;
+  }
 }
 
 function showWaitingOverlay() {
-  const overlay = ensureWaitingOverlay();
-  overlay.hidden = false;
-  document.body.classList.add("connection-waiting");
-
-  if (typeof stateLine !== "undefined" && stateLine) {
-    stateLine.textContent = "reconnecting";
+  if (typeof showConnectionOverlay === "function") {
+    showConnectionOverlay("connecting");
   }
-  if (typeof updateEssenceState === "function") {
-    updateEssenceState();
-  }
-
   updateWaitingStatus(0);
   startWaitingMessageRotation();
 }
 
 function hideWaitingOverlay() {
-  const overlay = document.getElementById("nano-waiting-overlay");
-  if (overlay) {
-    overlay.hidden = true;
+  if (connectionOverlayMode && connectionOverlayMode !== "connecting") {
+    return;
   }
-  document.body.classList.remove("connection-waiting");
   stopWaitingMessageRotation();
+  if (typeof hideConnectionOverlay === "function") {
+    hideConnectionOverlay();
+  }
 }
 
 function stopConnectionPoll() {

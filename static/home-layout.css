@@ -959,11 +959,22 @@ body[data-display-state="speaking"] .essence-zone::before {
 body[data-display-state="reconnecting"] .essence-zone::before {
   background: radial-gradient(
     circle,
-    rgba(120, 130, 125, 0.05) 0%,
-    rgba(120, 130, 125, 0.02) 40%,
+    rgba(120, 130, 125, 0.08) 0%,
+    rgba(120, 130, 125, 0.03) 40%,
     transparent 72%
   );
-  opacity: 0.6;
+  opacity: 0.72;
+}
+
+body[data-display-state="rebooting"] .essence-zone::before {
+  background: radial-gradient(
+    circle,
+    rgba(255, 180, 70, 0.14) 0%,
+    rgba(255, 140, 40, 0.05) 38%,
+    transparent 72%
+  );
+  opacity: 0.85;
+  animation: workingPulse 3.6s ease-in-out infinite;
 }
 
 @keyframes workingPulse {

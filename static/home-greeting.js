@@ -140,7 +140,9 @@ async function refreshStandbyGreeting(options = {}) {
     }
     renderState();
     const speakOnce = options.speakOnce === true;
-    const bootKey = bootGreetingStorageKey(options.bootEvent);
+    const bootKey =
+      String(options.bootKey || "").trim() ||
+      bootGreetingStorageKey(options.bootEvent);
     const shouldSpeak = speakOnce && voiceAvailable && Boolean(bootKey);
     if (shouldSpeak) {
       const spoke = await speakBootGreetingIfNeeded(greeting, bootKey);

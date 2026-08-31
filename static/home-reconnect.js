@@ -22,104 +22,11 @@ const RECONNECT_LABELS = {
   restart_nano: "Waiting for Nano to restart.",
 };
 
-const DEFAULT_RESTART_CONFIRMATION_POOL = [
-  "Quick check — want me to restart Nano? Yes to go ahead, no to cancel.",
-  "I can bounce and come back. Your call — yes or no?",
-  "Heads up: this restarts the service. Still want to?",
-  "Ready when you are. Restart Nano — yes or no?",
-  "Just to be sure — restart the service? Yes proceeds, no backs out.",
-  "Restart incoming, if you confirm. Yes or no?",
-  "Want a fresh start? Say yes to restart, no to keep going.",
-  "I can restart myself and be right back. Go for it? Yes or no.",
-  "Double-checking: restart now? Yes or no.",
-  "Say yes to restart Nano, or no to leave things as they are.",
-];
+const REBOOT_MIN_RESTORE_MS = 20_000;
+const CONNECTION_RECOVERY_POLL_MS = 2_000;
+const CONNECTION_RECOVERY_TIMEOUT_MS = 120_000;
 
-const DEFAULT_REBOOT_CONFIRMATION_POOL = [
-  "That'll reboot the Pi. Still good? Yes or no.",
-  "Ready to reboot the Raspberry Pi? Yes to confirm, no to cancel.",
-  "Heads up — full Pi reboot ahead. Proceed? Yes or no.",
-  "Just checking: reboot the Pi now? Yes or no.",
-  "This reboots the whole Raspberry Pi. Your call — yes or no?",
-  "Pi reboot on deck. Confirm with yes, or no to skip.",
-  "Want me to reboot the Pi? Yes to go ahead, no to back out.",
-  "Full system reboot coming up. Still want to? Yes or no.",
-  "Double-checking before I reboot the Pi. Yes or no?",
-  "Say yes to reboot the Pi, or no to keep it running.",
-];
-
-const SYSTEM_COMMAND_CONFIRMATION_POOLS = {
-  reboot_pi: [...DEFAULT_REBOOT_CONFIRMATION_POOL],
-  restart_nano: [...DEFAULT_RESTART_CONFIRMATION_POOL],
-};
-
-let lastRestartConfirmation = "";
-let lastRebootConfirmation = "";
-
-function pickSystemCommandConfirmation(commandId) {
-  const pool = SYSTEM_COMMAND_CONFIRMATION_POOLS[commandId];
-  if (!pool || pool.length === 0) {
-    return "Reply yes to confirm or no to cancel.";
-  }
-  if (pool.length === 1) {
-    const pick = pool[0];
-    if (commandId === "reboot_pi") {
-      lastRebootConfirmation = pick;
-    } else {
-      lastRestartConfirmation = pick;
-    }
-    return pick;
-  }
-  const lastPick = commandId === "reboot_pi" ? lastRebootConfirmation : lastRestartConfirmation;
-  let pick = pool[0];
-  do {
-    pick = pool[Math.floor(Math.random() * pool.length)];
-  } while (pick === lastPick);
-  if (commandId === "reboot_pi") {
-    lastRebootConfirmation = pick;
-  } else {
-    lastRestartConfirmation = pick;
-  }
-  return pick;
-}
-
-function isSystemCommandTerminalResponse(answerText) {
-  return Boolean(
-    matchSystemCommandPhrase(answerText, RECONNECT_SUCCESS) ||
-      matchSystemCommandPhrase(answerText, RECONNECT_CANCEL) ||
-      matchSystemCommandPhrase(answerText, RECONNECT_DISABLED)
-  );
-}
-
-function isSystemCommandYesNoPrompt(answerText) {
-  const content = String(answerText || "");
-  const lowered = content.toLowerCase();
-  return (
-    answerNeedsYesNoConfirmation(content) ||
-    lowered.includes("reply yes to proceed or no to cancel")
-  );
-}
-
-function resolveSystemCommandConfirmation(answerText, userMessage) {
-  const content = String(answerText || "").trim();
-  if (!content || isSystemCommandTerminalResponse(content)) {
-    return content;
-  }
-  if (!isSystemCommandYesNoPrompt(content)) {
-    return content;
-  }
-
-  const commandId =
-    pendingSystemCommandId ||
-    inferSystemCommandFromMessage(userMessage) ||
-    inferSystemCommandFromMessage(content);
-  if (!isSystemCommandId(commandId)) {
-    return content;
-  }
-
-  setPendingSystemCommand(commandId);
-  return pickSystemCommandConfirmation(commandId);
-}
+let connectionRecoveryPromise = null;
 
 function isSystemCommandId(commandId) {
   return SYSTEM_COMMAND_IDS.has(String(commandId || "").trim());
@@ -185,88 +92,151 @@ function setPendingSystemCommand(commandId) {
   }
 }
 
-function ensureReconnectOverlay() {
-  let overlay = document.getElementById("nano-reconnect-overlay");
-  if (overlay) {
-    return overlay;
+function enterConnectionRecoveryState() {
+  reconnectInProgress = true;
+  stateLine.textContent = "reconnecting";
+  document.body.dataset.displayState = "reconnecting";
+  if (typeof updateEssenceState === "function") {
+    updateEssenceState();
   }
-
-  overlay = document.createElement("section");
-  overlay.id = "nano-reconnect-overlay";
-  overlay.className = "nano-reconnect-overlay";
-  overlay.hidden = true;
-  overlay.innerHTML = `
-    <div class="nano-reconnect-panel" role="status" aria-live="polite">
-      <h2 id="nano-reconnect-title">Reconnecting to Nano</h2>
-      <p id="nano-reconnect-detail">Waiting for Nano to come back online.</p>
-      <p id="nano-reconnect-status" class="nano-reconnect-status"></p>
-      <div class="nano-reconnect-actions" hidden>
-        <button type="button" id="nano-reconnect-retry">Refresh</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-
-  const retryButton = overlay.querySelector("#nano-reconnect-retry");
-  retryButton.addEventListener("click", () => {
-    void recoverAfterReconnect();
-  });
-
-  return overlay;
-}
-
-function showReconnectOverlay(kind, statusText) {
-  const overlay = ensureReconnectOverlay();
-  const title = overlay.querySelector("#nano-reconnect-title");
-  const detail = overlay.querySelector("#nano-reconnect-detail");
-  const status = overlay.querySelector("#nano-reconnect-status");
-  const actions = overlay.querySelector(".nano-reconnect-actions");
-
-  title.textContent =
-    kind === "reboot_pi" ? "Reconnecting after reboot" : "Reconnecting after restart";
-  detail.textContent = RECONNECT_LABELS[kind] || "Waiting for Nano to come back online.";
-  status.textContent = statusText || "Checking connection...";
-  actions.hidden = true;
-  overlay.hidden = false;
   updateInputLock();
 }
 
-function hideReconnectOverlay() {
-  const overlay = document.getElementById("nano-reconnect-overlay");
-  if (!overlay) {
+function sleep(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+async function delayUntilMinElapsed(minMs, startedAt) {
+  const elapsed = Date.now() - startedAt;
+  const remaining = minMs - elapsed;
+  if (remaining > 0) {
+    await sleep(remaining);
+  }
+}
+
+async function waitForRebootMinimumHold() {
+  await delayUntilMinElapsed(REBOOT_MIN_RESTORE_MS, connectionRecoveryStartedAt);
+}
+
+async function animateRebootHold() {
+  if (typeof setConnectionOverlayStep === "function") {
+    setConnectionOverlayStep(1);
+  }
+  if (typeof updateConnectionOverlayStatus === "function") {
+    updateConnectionOverlayStatus("Starting up");
+  }
+
+  const elapsed = Date.now() - connectionRecoveryStartedAt;
+  const remaining = REBOOT_MIN_RESTORE_MS - elapsed;
+  if (remaining <= 0) {
     return;
   }
-  overlay.hidden = true;
-  const actions = overlay.querySelector(".nano-reconnect-actions");
-  if (actions) {
-    actions.hidden = true;
-  }
-  updateInputLock();
-}
 
-function showReconnectFailure(message) {
-  const overlay = ensureReconnectOverlay();
-  const status = overlay.querySelector("#nano-reconnect-status");
-  const actions = overlay.querySelector(".nano-reconnect-actions");
-  status.textContent = message || "Could not reconnect. Check the Pi and refresh.";
-  actions.hidden = false;
-  overlay.hidden = false;
-  updateInputLock();
+  const midpoint = Math.max(0, remaining - 4_000);
+  if (midpoint > 0) {
+    await sleep(midpoint);
+  }
+
+  if (typeof setConnectionOverlayStep === "function") {
+    setConnectionOverlayStep(2);
+  }
+  if (typeof updateConnectionOverlayStatus === "function") {
+    updateConnectionOverlayStatus("Almost ready");
+  }
+
+  await delayUntilMinElapsed(REBOOT_MIN_RESTORE_MS, connectionRecoveryStartedAt);
 }
 
 async function recoverAfterReconnect() {
-  hideReconnectOverlay();
+  if (typeof hideConnectionOverlay === "function") {
+    hideConnectionOverlay();
+  }
+  connectionRecoveryStartedAt = 0;
+  reconnectInProgress = false;
+  clearPendingSystemCommand();
   stateLine.textContent = "standby";
-  updateEssenceState();
+  if (typeof renderState === "function") {
+    renderState();
+  } else if (typeof updateEssenceState === "function") {
+    updateEssenceState();
+  }
   if (typeof closeActivityEventSource === "function") {
     closeActivityEventSource();
   }
   if (typeof bootstrap === "function") {
     await bootstrap();
   }
-  reconnectInProgress = false;
-  clearPendingSystemCommand();
   updateInputLock();
+}
+
+function showConnectionRecoveryFailure(message) {
+  if (typeof showConnectionOverlayFailure === "function") {
+    showConnectionOverlayFailure(message, () => {
+      void recoverAfterReconnect();
+    });
+  }
+}
+
+async function runConnectionRecovery({
+  overlayMode,
+  timeoutMs,
+  minHoldMs = 0,
+  statusText = "Checking connection...",
+  onRecovered,
+}) {
+  if (reconnectInProgress && connectionRecoveryPromise) {
+    return connectionRecoveryPromise;
+  }
+
+  connectionRecoveryStartedAt = Date.now();
+  enterConnectionRecoveryState();
+
+  if (typeof showConnectionOverlay === "function") {
+    showConnectionOverlay(overlayMode, { statusText });
+  }
+
+  if (typeof closeActivityEventSource === "function") {
+    closeActivityEventSource();
+  }
+
+  connectionRecoveryPromise = (async () => {
+    if (typeof updateConnectionOverlayStatus === "function") {
+      updateConnectionOverlayStatus(statusText);
+    }
+
+    const recovered = await waitForNano({
+      timeoutMs,
+      intervalMs: CONNECTION_RECOVERY_POLL_MS,
+    });
+
+    if (!recovered) {
+      reconnectInProgress = false;
+      connectionRecoveryStartedAt = 0;
+      showConnectionRecoveryFailure("Could not reconnect. Check the Pi and refresh.");
+      return false;
+    }
+
+    if (overlayMode === "rebooting") {
+      await animateRebootHold();
+    } else if (minHoldMs > 0) {
+      await delayUntilMinElapsed(minHoldMs, connectionRecoveryStartedAt);
+    }
+
+    if (typeof onRecovered === "function") {
+      await onRecovered();
+    }
+
+    await recoverAfterReconnect();
+    return true;
+  })();
+
+  try {
+    return await connectionRecoveryPromise;
+  } finally {
+    connectionRecoveryPromise = null;
+  }
 }
 
 async function beginNanoReconnect(kind) {
@@ -274,27 +244,30 @@ async function beginNanoReconnect(kind) {
     return;
   }
 
-  reconnectInProgress = true;
-  stateLine.textContent = "reconnecting";
-  updateEssenceState();
-  showReconnectOverlay(kind, "Checking connection...");
-  if (typeof closeActivityEventSource === "function") {
-    closeActivityEventSource();
-  }
-
-  const recovered = await waitForNano({
-    timeoutMs: RECONNECT_TIMEOUT_MS[kind] || 120_000,
-    intervalMs: 2_000,
+  const overlayMode = kind === "reboot_pi" ? "rebooting" : "restarting";
+  await runConnectionRecovery({
+    overlayMode,
+    timeoutMs: RECONNECT_TIMEOUT_MS[kind] || CONNECTION_RECOVERY_TIMEOUT_MS,
+    statusText:
+      overlayMode === "rebooting"
+        ? RECONNECT_LABELS.reboot_pi
+        : RECONNECT_LABELS.restart_nano,
   });
+}
 
-  if (recovered) {
-    await recoverAfterReconnect();
+async function beginConnectionRecovery() {
+  if (reconnectInProgress) {
     return;
   }
 
-  reconnectInProgress = false;
-  showReconnectFailure("Could not reconnect. Check the Pi and refresh.");
+  await runConnectionRecovery({
+    overlayMode: "connecting",
+    timeoutMs: CONNECTION_RECOVERY_TIMEOUT_MS,
+    statusText: "Trying to reconnect",
+  });
 }
+
+window.beginConnectionRecovery = beginConnectionRecovery;
 
 function handleSystemCommandResponse(answerText) {
   const disabledKind = matchSystemCommandPhrase(

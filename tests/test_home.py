@@ -129,7 +129,9 @@ def test_homepage_uses_remote_api_client() -> None:
     html_text = _load_index_html()
 
     assert "./static/nano-api.js" in html_text
+    assert "./static/nano-connection-overlay.js" in html_text
     assert "./static/nano-settings.js" in html_text
+    assert "./static/nano-connection-overlay.css" in html_text
     assert 'type="importmap"' in html_text
     assert "three.module.min.js" in html_text
     assert 'type="module" src="./static/essence_visualizer.js' in html_text
@@ -259,8 +261,9 @@ def test_bootstrap_waits_for_api_connection() -> None:
 def test_connection_settings_in_commands_panel() -> None:
     html_text = _load_index_html()
     settings_js = (STATIC_DIR / "nano-settings.js").read_text(encoding="utf-8")
+    overlay_js = (STATIC_DIR / "nano-connection-overlay.js").read_text(encoding="utf-8")
+    overlay_css = (STATIC_DIR / "nano-connection-overlay.css").read_text(encoding="utf-8")
     view_session_js = (STATIC_DIR / "home-view-session.js").read_text(encoding="utf-8")
-    settings_css = (STATIC_DIR / "nano-settings.css").read_text(encoding="utf-8")
 
     assert 'id="nano-connection-url"' in html_text
     assert 'id="nano-connection-key"' in html_text
@@ -268,9 +271,11 @@ def test_connection_settings_in_commands_panel() -> None:
     assert "commands-connection-dropdown" in html_text
     assert "initConnectionSettings" in settings_js
     assert "openConnectionSettings" in settings_js
-    assert "nano-waiting-overlay" in settings_js
+    assert "showConnectionOverlay" in settings_js
+    assert "nano-connection-overlay" in overlay_js
+    assert "showConnectionOverlay" in overlay_js
     assert "initConnectionSettings" in view_session_js
-    assert "body.connection-waiting .view-modal" in settings_css
+    assert "body.nano-connection-active .view-modal" in overlay_css
 
 
 def test_task_start_acknowledgment() -> None:
@@ -303,7 +308,10 @@ def test_reboot_restart_reconnect_helpers() -> None:
     entry_js = (STATIC_DIR / "home-entry.js").read_text(encoding="utf-8")
 
     assert "waitForNano" in api_js
-    assert "nano-reconnect-overlay" in reconnect_js
+    assert "beginConnectionRecovery" in reconnect_js
+    assert "REBOOT_MIN_RESTORE_MS" in reconnect_js
+    assert "20_000" in reconnect_js
+    assert "showConnectionOverlay" in reconnect_js
     assert "beginNanoReconnect" in reconnect_js
     assert "reboot_pi" in reconnect_js
     assert "restart_nano" in reconnect_js
@@ -315,13 +323,35 @@ def test_reboot_restart_reconnect_helpers() -> None:
     assert "pendingSystemCommandId" in activity_js
     assert "reboot_confirmation" not in voice_js
     assert "restart_confirmation" not in voice_js
-    assert "pickSystemCommandConfirmation" in reconnect_js
-    assert "resolveSystemCommandConfirmation" in reconnect_js
-    restart_pool = reconnect_js.split("const DEFAULT_RESTART_CONFIRMATION_POOL = [", 1)[1].split("];", 1)[0]
-    reboot_pool = reconnect_js.split("const DEFAULT_REBOOT_CONFIRMATION_POOL = [", 1)[1].split("];", 1)[0]
-    assert restart_pool.count('"') // 2 >= 10
-    assert reboot_pool.count('"') // 2 >= 10
-    assert "resolveSystemCommandConfirmation(" in chat_js
+    assert "pickSystemCommandConfirmation" not in reconnect_js
+    assert "resolveSystemCommandConfirmation" not in reconnect_js
+    assert "DEFAULT_REBOOT_CONFIRMATION_POOL" not in reconnect_js
+    assert "DEFAULT_RESTART_CONFIRMATION_POOL" not in reconnect_js
+    assert "resolveSystemCommandConfirmation(" not in chat_js
+    assert "answerText: data.content" in chat_js
+
+
+def test_boot_state_sync() -> None:
+    activity_js = (STATIC_DIR / "home-activity.js").read_text(encoding="utf-8")
+    boot_js = (STATIC_DIR / "home-boot.js").read_text(encoding="utf-8")
+    greeting_js = (STATIC_DIR / "home-greeting.js").read_text(encoding="utf-8")
+    events_js = (STATIC_DIR / "home-events.js").read_text(encoding="utf-8")
+    state_js = (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
+    reconnect_js = (STATIC_DIR / "home-reconnect.js").read_text(encoding="utf-8")
+    modules = json.loads((STATIC_DIR / "home-modules.json").read_text(encoding="utf-8"))
+
+    assert "home-boot.js" in modules
+    assert "syncBootState" in boot_js
+    assert "applyBootCompleteUI" in boot_js
+    assert "nano_last_boot_id" in state_js
+    assert "LAST_BOOT_ID_KEY" in state_js
+    assert "reboot_pending" in boot_js
+    assert "rebootPendingFromStatus" in state_js
+    assert "await syncBootState(snapshot)" in activity_js
+    assert "options.bootKey" in greeting_js
+    assert "rebootPendingFromStatus" in events_js
+    assert "beginNanoReconnect" in events_js
+    assert "pickSystemCommandConfirmation" not in reconnect_js
 
 
 def test_improvement_plans_removed() -> None:

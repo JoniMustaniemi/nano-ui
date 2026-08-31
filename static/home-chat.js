@@ -244,7 +244,7 @@ async function sendChatRequest(message, source) {
     throw new Error(data.detail || "Chat request failed.");
   }
   return {
-    answerText: resolveSystemCommandConfirmation(data.content, message),
+    answerText: data.content,
     shouldSpeak: data.speak !== false,
   };
 }

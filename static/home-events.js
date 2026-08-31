@@ -239,6 +239,16 @@ function listen(lastEventId = 0) {
     if (reconnectInProgress) {
       return;
     }
+    if (rebootPendingFromStatus || connectionOverlayMode === "rebooting") {
+      if (typeof beginNanoReconnect === "function") {
+        void beginNanoReconnect("reboot_pi");
+      }
+      return;
+    }
+    if (typeof beginConnectionRecovery === "function") {
+      void beginConnectionRecovery();
+      return;
+    }
     stateLine.textContent = "reconnecting";
     updateEssenceState();
   };
