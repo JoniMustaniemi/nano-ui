@@ -1278,6 +1278,8 @@ function pendingListenStatus(kind) {
   const labels = {
     timer_duration: 'Say a duration after "hey nano".',
     wipe_confirmation: 'Say yes or no after "hey nano".',
+    reboot_confirmation: 'Say yes or no after "hey nano".',
+    service_restart_confirmation: 'Say yes or no after "hey nano".',
   };
   return labels[kind] || 'Say your answer after "hey nano".';
 }

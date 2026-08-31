@@ -68,7 +68,7 @@ const VOICE_MODE_STORAGE_KEY = "nano.voiceMode";
 const DEBUG_MODE_STORAGE_KEY = "nano.debugMode";
 const CALENDAR_LANG_STORAGE_KEY = "nano.calendarLang";
 const MEETING_REMINDER_STORAGE_KEY = "nano.meetingReminders";
-const DEFAULT_VOICE_VOLUME = 0.8;
+const DEFAULT_VOICE_VOLUME = 0.5;
 let voiceModeEnabled = false;
 let debugModeEnabled = false;
 let waitingForWakeCommand = false;
@@ -95,7 +95,9 @@ let reconnectInProgress = false;
 let connectionOverlayMode = null;
 let connectionRecoveryStartedAt = 0;
 let rebootPendingFromStatus = false;
-const LAST_BOOT_ID_KEY = "nano_last_boot_id";
+let rebootBaselineBootId = null;
+const LAST_BOOT_ID_KEY = "nano_boot_id";
+const LEGACY_BOOT_ID_KEY = "nano_last_boot_id";
 
 // Copy and display constants
 const activityStates = ["standby", "working", "error"];

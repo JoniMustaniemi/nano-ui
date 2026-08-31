@@ -326,8 +326,8 @@ def test_reboot_restart_reconnect_helpers() -> None:
     assert "home-reconnect.js" in (STATIC_DIR / "home-modules.json").read_text(encoding="utf-8")
     assert "reconnectInProgress" in activity_js
     assert "pendingSystemCommandId" in activity_js
-    assert "reboot_confirmation" not in voice_js
-    assert "restart_confirmation" not in voice_js
+    assert "reboot_confirmation" in voice_js
+    assert "service_restart_confirmation" in voice_js
     assert "pickSystemCommandConfirmation" not in reconnect_js
     assert "resolveSystemCommandConfirmation" not in reconnect_js
     assert "DEFAULT_REBOOT_CONFIRMATION_POOL" not in reconnect_js
@@ -348,15 +348,49 @@ def test_boot_state_sync() -> None:
     assert "home-boot.js" in modules
     assert "syncBootState" in boot_js
     assert "applyBootCompleteUI" in boot_js
-    assert "nano_last_boot_id" in state_js
+    assert "nano_boot_id" in state_js
+    assert "LEGACY_BOOT_ID_KEY" in state_js
     assert "LAST_BOOT_ID_KEY" in state_js
+    assert "pollStatusUntilBootIdChanges" in boot_js
+    assert "clearTransientUIState" in boot_js
+    assert "realReboot" in boot_js
     assert "reboot_pending" in boot_js
     assert "rebootPendingFromStatus" in state_js
+    assert "rebootBaselineBootId" in state_js
     assert "await syncBootState(snapshot)" in activity_js
     assert "options.bootKey" in greeting_js
     assert "rebootPendingFromStatus" in events_js
     assert "beginNanoReconnect" in events_js
+    assert "pollStatusUntilBootIdChanges" in reconnect_js
     assert "pickSystemCommandConfirmation" not in reconnect_js
+
+
+def test_pending_confirmation_kinds() -> None:
+    ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+    greeting_js = (STATIC_DIR / "home-greeting.js").read_text(encoding="utf-8")
+    voice_js = (STATIC_DIR / "home-voice.js").read_text(encoding="utf-8")
+
+    assert "reboot_confirmation" in ui_js
+    assert "service_restart_confirmation" in ui_js
+    assert "VOICE_YES_NO_PENDING_KINDS" in ui_js
+    assert "BUTTON_YES_NO_PENDING_KINDS" in ui_js
+    assert "reboot_confirmation" not in ui_js.split("BUTTON_YES_NO_PENDING_KINDS = new Set([", 1)[1].split("]);", 1)[0]
+    assert "service_restart_confirmation" not in ui_js.split("BUTTON_YES_NO_PENDING_KINDS = new Set([", 1)[1].split("]);", 1)[0]
+    assert "PENDING_SYSTEM_COMMAND_KINDS" in greeting_js
+    assert 'reboot_confirmation: "reboot_pi"' in greeting_js
+    assert 'service_restart_confirmation: "restart_nano"' in greeting_js
+    assert "VOICE_YES_NO_PENDING_KINDS.has(kind)" in greeting_js
+    assert "reboot_confirmation:" in voice_js
+    assert "service_restart_confirmation:" in voice_js
+
+
+def test_confused_reply_styling() -> None:
+    ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+    css_text = _load_home_css()
+
+    assert "isConfusedReply" in ui_js
+    assert "dataset.confused" in ui_js
+    assert "data-confused" in css_text
 
 
 def test_improvement_plans_removed() -> None:

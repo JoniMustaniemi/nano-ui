@@ -99,11 +99,14 @@ body.nano-connection-mode--rebooting .nano-connection-headline {
   font-size: clamp(0.92rem, 2.4vw, 1rem);
   line-height: 1.45;
   color: rgba(240, 255, 244, 0.84);
-  transition: opacity 400ms ease;
+  transition:
+    opacity 900ms ease-in-out,
+    transform 900ms ease-in-out;
 }
 
 .nano-connection-detail.is-fading {
   opacity: 0;
+  transform: translateY(6px);
 }
 
 @keyframes nano-connection-ring-spin {

@@ -1,3 +1,50 @@
+function readStoredBootId() {
+  try {
+    let current = window.sessionStorage.getItem(LAST_BOOT_ID_KEY) || "";
+    if (!current) {
+      const legacy = window.sessionStorage.getItem(LEGACY_BOOT_ID_KEY) || "";
+      if (legacy) {
+        window.sessionStorage.setItem(LAST_BOOT_ID_KEY, legacy);
+        window.sessionStorage.removeItem(LEGACY_BOOT_ID_KEY);
+        current = legacy;
+      }
+    }
+    return current;
+  } catch (_error) {
+    return "";
+  }
+}
+
+function writeStoredBootId(bootId) {
+  try {
+    window.sessionStorage.setItem(LAST_BOOT_ID_KEY, bootId);
+    window.sessionStorage.removeItem(LEGACY_BOOT_ID_KEY);
+  } catch (_error) {
+    // Ignore storage write failures.
+  }
+}
+
+function clearTransientUIState() {
+  if (typeof clearPendingState === "function") {
+    clearPendingState();
+  }
+  if (typeof clearPendingSystemCommand === "function") {
+    clearPendingSystemCommand();
+  }
+  if (typeof clearAnswerClearTimer === "function") {
+    clearAnswerClearTimer();
+  }
+  if (typeof cancelAnswerReveal === "function") {
+    cancelAnswerReveal();
+  }
+  waitingForFollowUp = false;
+  waitingForVoiceAnswer = false;
+  suppressPendingRearm = false;
+  if (typeof setYesNoConfirmationActive === "function") {
+    setYesNoConfirmationActive(false);
+  }
+}
+
 function applyBootCompleteUI({ title, detail }) {
   const headline = String(title || "Booting complete.").trim();
   const detailText = String(detail || "I'm ready and awake.").trim();
@@ -15,6 +62,34 @@ function applyBootCompleteUI({ title, detail }) {
   renderState();
 }
 
+async function pollStatusUntilBootIdChanges(
+  previousBootId,
+  { timeoutMs = 180_000, intervalMs = 2_000 } = {},
+) {
+  const baseline = String(previousBootId || "").trim();
+  if (!baseline || typeof loadSnapshot !== "function") {
+    return null;
+  }
+
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const snapshot = await loadSnapshot();
+      const boot = snapshot?.boot;
+      const nextBootId = String(boot?.id || "").trim();
+      if (nextBootId && nextBootId !== baseline && boot?.reboot_pending !== true) {
+        return snapshot;
+      }
+    } catch (_error) {
+      // Keep polling until timeout.
+    }
+    await new Promise((resolve) => {
+      window.setTimeout(resolve, intervalMs);
+    });
+  }
+  return null;
+}
+
 async function syncBootState(snapshot) {
   const boot = snapshot?.boot;
   if (!boot || typeof boot !== "object") {
@@ -23,29 +98,27 @@ async function syncBootState(snapshot) {
   }
 
   rebootPendingFromStatus = boot.reboot_pending === true;
+  const bootId = String(boot.id || "").trim();
 
   if (rebootPendingFromStatus) {
+    if (bootId && !rebootBaselineBootId) {
+      rebootBaselineBootId = bootId;
+    }
     if (!reconnectInProgress && typeof beginNanoReconnect === "function") {
       void beginNanoReconnect("reboot_pi");
     }
     return { freshBoot: false, rebootPending: true };
   }
 
-  const bootId = String(boot.id || "").trim();
   if (!bootId) {
     return { freshBoot: false };
   }
 
-  let previous = "";
-  try {
-    previous = window.sessionStorage.getItem(LAST_BOOT_ID_KEY) || "";
-  } catch (_error) {
-    // Ignore storage read failures.
-  }
+  const previous = readStoredBootId();
+  const realReboot = Boolean(previous) && previous !== bootId;
 
-  const freshBoot = !previous || previous !== bootId;
-
-  if (freshBoot) {
+  if (realReboot) {
+    clearTransientUIState();
     const bootEvent = findLatestBootEvent(snapshot);
     applyBootCompleteUI({
       title: bootEvent?.title || "Booting complete.",
@@ -54,11 +127,8 @@ async function syncBootState(snapshot) {
     await refreshStandbyGreeting({ speakOnce: true, bootKey: bootId });
   }
 
-  try {
-    window.sessionStorage.setItem(LAST_BOOT_ID_KEY, bootId);
-  } catch (_error) {
-    // Ignore storage write failures.
-  }
+  writeStoredBootId(bootId);
+  rebootBaselineBootId = null;
 
-  return { freshBoot, rebootPending: false };
+  return { freshBoot: realReboot, rebootPending: false };
 }

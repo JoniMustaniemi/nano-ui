@@ -186,10 +186,17 @@ function applyPendingSnapshot(pending, proactive) {
   if (kind === "presence_check") {
     return;
   }
+  const PENDING_SYSTEM_COMMAND_KINDS = {
+    reboot_confirmation: "reboot_pi",
+    service_restart_confirmation: "restart_nano",
+  };
+  if (PENDING_SYSTEM_COMMAND_KINDS[kind] && typeof setPendingSystemCommand === "function") {
+    setPendingSystemCommand(PENDING_SYSTEM_COMMAND_KINDS[kind]);
+  }
   currentAnswerPendingKind = kind;
   currentPendingSnapshot = pending;
   currentInputKind = null;
   ensureDirectAnswerListening(pendingListenStatus(kind));
-  setYesNoConfirmationActive(YES_NO_PENDING_KINDS.has(kind));
+  setYesNoConfirmationActive(VOICE_YES_NO_PENDING_KINDS.has(kind));
   syncInputActions();
 }

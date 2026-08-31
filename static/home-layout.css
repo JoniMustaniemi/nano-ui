@@ -257,6 +257,11 @@ body[data-display-state="working"] .keyboard-panel {
   -webkit-text-fill-color: transparent;
 }
 
+.response-headline[data-confused="true"] {
+  opacity: 0.82;
+  font-style: italic;
+}
+
 .confirmation-actions,
 .input-actions {
   display: flex;

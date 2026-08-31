@@ -67,7 +67,18 @@ const SUPPLEMENTAL_TOOL_COMMANDS = [
     category: "System",
   },
 ];
-const YES_NO_PENDING_KINDS = new Set(["wipe_confirmation", "presence_check"]);
+const VOICE_YES_NO_PENDING_KINDS = new Set([
+  "wipe_confirmation",
+  "reboot_confirmation",
+  "service_restart_confirmation",
+  "presence_check",
+]);
+const BUTTON_YES_NO_PENDING_KINDS = new Set([
+  "wipe_confirmation",
+  "presence_check",
+]);
+// Backward-compatible alias for tests and callers that check membership.
+const YES_NO_PENDING_KINDS = VOICE_YES_NO_PENDING_KINDS;
 const YES_NO_INPUT_ACTIONS = [
   { label: "Yes", value: "yes", variant: "yes" },
   { label: "No", value: "no", variant: "no" },
@@ -220,10 +231,10 @@ function setYesNoConfirmationActive(active) {
 }
 
 function getInputActionsForCurrentState() {
-  if (waitingForYesNoConfirmation || waitingForPresence) {
+  if (waitingForPresence) {
     return YES_NO_INPUT_ACTIONS;
   }
-  if (currentAnswerPendingKind && YES_NO_PENDING_KINDS.has(currentAnswerPendingKind)) {
+  if (currentAnswerPendingKind && BUTTON_YES_NO_PENDING_KINDS.has(currentAnswerPendingKind)) {
     return YES_NO_INPUT_ACTIONS;
   }
   if (currentAnswerPendingKind === "timer_duration" || currentInputKind === "timer_duration") {
@@ -1524,6 +1535,17 @@ function resumeAnswerClearAfterSpeech() {
   scheduleAnswerClear();
 }
 
+function isConfusedReply(text) {
+  const lowered = String(text || "").toLowerCase();
+  return (
+    /does not resolve/.test(lowered) ||
+    /not in my catalog/.test(lowered) ||
+    /can't help with that/.test(lowered) ||
+    /don't understand/.test(lowered) ||
+    /not sure what you mean/.test(lowered)
+  );
+}
+
 function setAnswer(text, options = {}) {
   const content = text.trim();
   const animate = options.animate !== false;
@@ -1558,6 +1580,7 @@ function setAnswer(text, options = {}) {
     answerOutput.textContent = "";
     answerOutput.classList.add("empty");
     delete answerOutput.dataset.taskAck;
+    delete answerOutput.dataset.confused;
     applyResponseTypography(IDLE_RESPONSE.length);
     renderActivityStatus();
     return;
@@ -1566,6 +1589,11 @@ function setAnswer(text, options = {}) {
     answerOutput.dataset.taskAck = "true";
   } else {
     delete answerOutput.dataset.taskAck;
+  }
+  if (options.confused === true || isConfusedReply(content)) {
+    answerOutput.dataset.confused = "true";
+  } else {
+    delete answerOutput.dataset.confused;
   }
   answerOutput.classList.remove("empty");
   applyResponseTypography(content.length);

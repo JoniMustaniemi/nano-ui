@@ -125,6 +125,7 @@ async function recoverAfterReconnect() {
   }
   connectionRecoveryStartedAt = 0;
   reconnectInProgress = false;
+  rebootBaselineBootId = null;
   clearPendingSystemCommand();
   stateLine.textContent = "standby";
   if (typeof renderState === "function") {
@@ -157,6 +158,15 @@ async function runConnectionRecovery({
     return connectionRecoveryPromise;
   }
 
+  const baselineBootId =
+    rebootBaselineBootId || readStoredBootId() || null;
+  if (
+    (overlayMode === "rebooting" || overlayMode === "restarting") &&
+    baselineBootId
+  ) {
+    rebootBaselineBootId = baselineBootId;
+  }
+
   connectionRecoveryStartedAt = Date.now();
   enterConnectionRecoveryState();
 
@@ -179,6 +189,23 @@ async function runConnectionRecovery({
       connectionRecoveryStartedAt = 0;
       showConnectionRecoveryFailure("Could not reconnect. Check the Pi and refresh.");
       return false;
+    }
+
+    if (
+      (overlayMode === "rebooting" || overlayMode === "restarting") &&
+      rebootBaselineBootId &&
+      typeof pollStatusUntilBootIdChanges === "function"
+    ) {
+      const snapshot = await pollStatusUntilBootIdChanges(rebootBaselineBootId, {
+        timeoutMs,
+        intervalMs: CONNECTION_RECOVERY_POLL_MS,
+      });
+      if (!snapshot) {
+        reconnectInProgress = false;
+        connectionRecoveryStartedAt = 0;
+        showConnectionRecoveryFailure("Could not reconnect. Check the Pi and refresh.");
+        return false;
+      }
     }
 
     if (overlayMode === "rebooting") {

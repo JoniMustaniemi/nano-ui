@@ -70,8 +70,8 @@ const CONNECTION_PERSONALITY_MESSAGES = [
   "Connection attempt in progress. Your cooperation will be remembered.",
 ];
 
-const CONNECTION_MESSAGE_ROTATE_MS = 4_000;
-const CONNECTION_MESSAGE_FADE_MS = 400;
+const CONNECTION_MESSAGE_ROTATE_MS = 12_000;
+const CONNECTION_MESSAGE_FADE_MS = 900;
 
 let connectionOverlayMessageIndex = -1;
 let connectionOverlayMessageTimer = null;
@@ -153,6 +153,7 @@ function rotateConnectionOverlayMessage() {
     setConnectionOverlayDetail(
       CONNECTION_PERSONALITY_MESSAGES[connectionOverlayMessageIndex],
     );
+    void detail.offsetHeight;
     detail.classList.remove("is-fading");
   }, CONNECTION_MESSAGE_FADE_MS);
 }
