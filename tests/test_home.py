@@ -274,6 +274,11 @@ def test_connection_settings_in_commands_panel() -> None:
     assert "showConnectionOverlay" in settings_js
     assert "nano-connection-overlay" in overlay_js
     assert "showConnectionOverlay" in overlay_js
+    assert "CONNECTION_PERSONALITY_MESSAGES" in overlay_js
+    assert "startConnectionOverlayMessages" in overlay_js
+    assert "REBOOT_OVERLAY_STEPS" not in overlay_js
+    assert "nano-connection-retry" not in overlay_js
+    assert "WAITING_MESSAGES" not in settings_js
     assert "initConnectionSettings" in view_session_js
     assert "body.nano-connection-active .view-modal" in overlay_css
 

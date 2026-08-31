@@ -17,11 +17,6 @@ const RECONNECT_TIMEOUT_MS = {
   restart_nano: 30_000,
 };
 
-const RECONNECT_LABELS = {
-  reboot_pi: "Waiting for the Raspberry Pi to come back online.",
-  restart_nano: "Waiting for Nano to restart.",
-};
-
 const REBOOT_MIN_RESTORE_MS = 20_000;
 const CONNECTION_RECOVERY_POLL_MS = 2_000;
 const CONNECTION_RECOVERY_TIMEOUT_MS = 120_000;
@@ -121,31 +116,6 @@ async function waitForRebootMinimumHold() {
 }
 
 async function animateRebootHold() {
-  if (typeof setConnectionOverlayStep === "function") {
-    setConnectionOverlayStep(1);
-  }
-  if (typeof updateConnectionOverlayStatus === "function") {
-    updateConnectionOverlayStatus("Starting up");
-  }
-
-  const elapsed = Date.now() - connectionRecoveryStartedAt;
-  const remaining = REBOOT_MIN_RESTORE_MS - elapsed;
-  if (remaining <= 0) {
-    return;
-  }
-
-  const midpoint = Math.max(0, remaining - 4_000);
-  if (midpoint > 0) {
-    await sleep(midpoint);
-  }
-
-  if (typeof setConnectionOverlayStep === "function") {
-    setConnectionOverlayStep(2);
-  }
-  if (typeof updateConnectionOverlayStatus === "function") {
-    updateConnectionOverlayStatus("Almost ready");
-  }
-
   await delayUntilMinElapsed(REBOOT_MIN_RESTORE_MS, connectionRecoveryStartedAt);
 }
 
@@ -173,9 +143,7 @@ async function recoverAfterReconnect() {
 
 function showConnectionRecoveryFailure(message) {
   if (typeof showConnectionOverlayFailure === "function") {
-    showConnectionOverlayFailure(message, () => {
-      void recoverAfterReconnect();
-    });
+    showConnectionOverlayFailure(message);
   }
 }
 
@@ -183,7 +151,6 @@ async function runConnectionRecovery({
   overlayMode,
   timeoutMs,
   minHoldMs = 0,
-  statusText = "Checking connection...",
   onRecovered,
 }) {
   if (reconnectInProgress && connectionRecoveryPromise) {
@@ -194,7 +161,7 @@ async function runConnectionRecovery({
   enterConnectionRecoveryState();
 
   if (typeof showConnectionOverlay === "function") {
-    showConnectionOverlay(overlayMode, { statusText });
+    showConnectionOverlay(overlayMode);
   }
 
   if (typeof closeActivityEventSource === "function") {
@@ -202,10 +169,6 @@ async function runConnectionRecovery({
   }
 
   connectionRecoveryPromise = (async () => {
-    if (typeof updateConnectionOverlayStatus === "function") {
-      updateConnectionOverlayStatus(statusText);
-    }
-
     const recovered = await waitForNano({
       timeoutMs,
       intervalMs: CONNECTION_RECOVERY_POLL_MS,
@@ -248,10 +211,6 @@ async function beginNanoReconnect(kind) {
   await runConnectionRecovery({
     overlayMode,
     timeoutMs: RECONNECT_TIMEOUT_MS[kind] || CONNECTION_RECOVERY_TIMEOUT_MS,
-    statusText:
-      overlayMode === "rebooting"
-        ? RECONNECT_LABELS.reboot_pi
-        : RECONNECT_LABELS.restart_nano,
   });
 }
 
@@ -263,7 +222,6 @@ async function beginConnectionRecovery() {
   await runConnectionRecovery({
     overlayMode: "connecting",
     timeoutMs: CONNECTION_RECOVERY_TIMEOUT_MS,
-    statusText: "Trying to reconnect",
   });
 }
 

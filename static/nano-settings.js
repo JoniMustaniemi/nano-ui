@@ -1,16 +1,7 @@
-const WAITING_MESSAGES = [
-  "Searching for your Raspberry Pi on the network...",
-  "Nano lives on your Pi — set the API URL in Connection settings.",
-  "Make sure your Pi is powered on and reachable.",
-  "I'll connect automatically once I find it.",
-];
-
 const CONNECTION_POLL_INTERVAL_MS = 5_000;
 
 let connectionSettingsInitialized = false;
 let connectionPollAbort = null;
-let messageRotateTimer = null;
-let messageIndex = 0;
 let connectionCompleting = false;
 
 function refreshConnectionFields() {
@@ -93,72 +84,16 @@ async function handleConnectionSuccess() {
   }
 }
 
-function setWaitingDetail(text) {
-  if (typeof updateConnectionOverlayDetail === "function") {
-    updateConnectionOverlayDetail(text);
-    return;
-  }
-  const detail = document.getElementById("nano-connection-detail");
-  if (!detail) {
-    return;
-  }
-  detail.textContent = text;
-}
-
-function rotateWaitingMessage() {
-  const detail = document.getElementById("nano-connection-detail");
-  if (!detail) {
-    return;
-  }
-
-  detail.classList.add("is-fading");
-  window.setTimeout(() => {
-    messageIndex = (messageIndex + 1) % WAITING_MESSAGES.length;
-    setWaitingDetail(WAITING_MESSAGES[messageIndex]);
-    detail.classList.remove("is-fading");
-  }, 400);
-}
-
-function startWaitingMessageRotation() {
-  stopWaitingMessageRotation();
-  messageIndex = 0;
-  setWaitingDetail(WAITING_MESSAGES[messageIndex]);
-  messageRotateTimer = window.setInterval(rotateWaitingMessage, 4_000);
-}
-
-function stopWaitingMessageRotation() {
-  if (messageRotateTimer) {
-    window.clearInterval(messageRotateTimer);
-    messageRotateTimer = null;
-  }
-}
-
-function updateWaitingStatus(attempt) {
-  const statusText =
-    attempt <= 1 ? "Checking connection" : "Still waiting — retrying";
-  if (typeof updateConnectionOverlayStatus === "function") {
-    updateConnectionOverlayStatus(statusText);
-    return;
-  }
-  const status = document.getElementById("nano-connection-status");
-  if (status) {
-    status.textContent = statusText;
-  }
-}
-
 function showWaitingOverlay() {
   if (typeof showConnectionOverlay === "function") {
     showConnectionOverlay("connecting");
   }
-  updateWaitingStatus(0);
-  startWaitingMessageRotation();
 }
 
 function hideWaitingOverlay() {
   if (connectionOverlayMode && connectionOverlayMode !== "connecting") {
     return;
   }
-  stopWaitingMessageRotation();
   if (typeof hideConnectionOverlay === "function") {
     hideConnectionOverlay();
   }
@@ -180,7 +115,6 @@ function startConnectionPoll() {
   };
 
   void (async () => {
-    let attempt = 0;
     while (!aborted) {
       if (hasApiConnection()) {
         try {
@@ -192,8 +126,6 @@ function startConnectionPoll() {
         }
       }
 
-      attempt += 1;
-      updateWaitingStatus(attempt);
       await new Promise((resolve) => {
         window.setTimeout(resolve, CONNECTION_POLL_INTERVAL_MS);
       });

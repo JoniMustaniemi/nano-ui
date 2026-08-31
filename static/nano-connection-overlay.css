@@ -106,68 +106,6 @@ body.nano-connection-mode--rebooting .nano-connection-headline {
   opacity: 0;
 }
 
-.nano-connection-steps {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.5rem 0.75rem;
-}
-
-.nano-connection-step {
-  padding: 0.35rem 0.75rem;
-  border-radius: 999px;
-  font-size: 0.78rem;
-  letter-spacing: 0.03em;
-  color: rgba(240, 255, 244, 0.55);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.nano-connection-step.is-active {
-  color: #ffd98a;
-  background: rgba(255, 180, 70, 0.18);
-}
-
-.nano-connection-step.is-done {
-  color: rgba(181, 255, 208, 0.9);
-  background: rgba(57, 255, 20, 0.12);
-}
-
-.nano-connection-status {
-  margin: 0;
-  min-height: 1.25rem;
-  font: 500 0.82rem/1.4 "Cascadia Mono", "Consolas", monospace;
-  color: var(--accent, #39ff14);
-  letter-spacing: 0.04em;
-}
-
-body.nano-connection-mode--rebooting .nano-connection-status {
-  color: #ffc46a;
-}
-
-.nano-connection-status::after {
-  content: "";
-  animation: nano-connection-dots 1.4s steps(4, end) infinite;
-}
-
-.nano-connection-actions {
-  display: flex;
-  justify-content: center;
-}
-
-.nano-connection-retry {
-  border: 0;
-  border-radius: 999px;
-  padding: 0.65rem 1.25rem;
-  min-height: 2.75rem;
-  background: #2f6fed;
-  color: #fff;
-  font-size: 0.95rem;
-  cursor: pointer;
-}
-
 @keyframes nano-connection-ring-spin {
   to {
     transform: rotate(360deg);
@@ -187,24 +125,6 @@ body.nano-connection-mode--rebooting .nano-connection-status {
   }
 }
 
-@keyframes nano-connection-dots {
-  0% {
-    content: "";
-  }
-
-  25% {
-    content: ".";
-  }
-
-  50% {
-    content: "..";
-  }
-
-  75% {
-    content: "...";
-  }
-}
-
 body.nano-connection-active .view-modal {
   z-index: 1050;
 }
@@ -220,15 +140,6 @@ body.nano-connection-active .view-modal {
     width: 100%;
     max-width: 32rem;
   }
-
-  .nano-connection-steps {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .nano-connection-step {
-    text-align: center;
-  }
 }
 
 @media (min-width: 641px) and (max-width: 1024px) {
@@ -241,9 +152,5 @@ body.nano-connection-active .view-modal {
   .nano-connection-shell {
     width: min(100%, 40rem);
     gap: 1.5rem;
-  }
-
-  .nano-connection-steps {
-    gap: 0.65rem 1rem;
   }
 }
