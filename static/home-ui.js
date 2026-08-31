@@ -47,7 +47,26 @@ const EXCLUDED_TOOL_COMMAND_IDS = new Set([
   "toggle_controls",
   "list_internal_notes",
 ]);
-const SUPPLEMENTAL_TOOL_COMMANDS = [];
+const SUPPLEMENTAL_TOOL_COMMANDS = [
+  {
+    id: "calendar_recap_today",
+    label: "Today's meetings",
+    message: "Do I have any meetings today?",
+    category: "Calendar",
+  },
+  {
+    id: "debug_mode_on",
+    label: "Debug mode on",
+    message: "Turn on debug mode",
+    category: "System",
+  },
+  {
+    id: "debug_mode_off",
+    label: "Debug mode off",
+    message: "Turn off debug mode",
+    category: "System",
+  },
+];
 const YES_NO_PENDING_KINDS = new Set(["wipe_confirmation", "presence_check"]);
 const YES_NO_INPUT_ACTIONS = [
   { label: "Yes", value: "yes", variant: "yes" },
@@ -430,13 +449,15 @@ async function runToolCommand(command) {
 }
 
 function normalizeUiCommandText(message) {
+  const wakeNamePattern =
+    "(?:nano|nanno|nana|nanna|neno|nono|nah no|na no|no no|na nah|nay no)";
   return message
     .trim()
     .toLowerCase()
     .replace(/[.!?,]+/g, " ")
     .replace(/[''´`]/g, "")
-    .replace(/\b(hey|hi)\s+nano\b/g, " ")
-    .replace(/\bnano\b/g, " ")
+    .replace(new RegExp(`\\b(?:hey|hay|hi)\\s*,?\\s*${wakeNamePattern}\\b`, "g"), " ")
+    .replace(new RegExp(`\\b${wakeNamePattern}\\b`, "g"), " ")
     .replace(/\bplease\b/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -486,6 +507,101 @@ const CALENDAR_SECTION_PATTERNS = [
   /\b(show|open|view|display)\b.*\b(full[- ]screen\s+)?calendar\b/,
 ];
 
+const CALENDAR_RECAP_PATTERNS = [
+  /\b(do i have|do we have|are there|any)\b.*\b(meetings?|calls?)\b/,
+  /\bwhat\b.*\b(meetings?|calls?)\b/,
+  /\b(meetings?|calls?)\b.*\b(today|this day)\b/,
+  /\b(today|this day)\b.*\b(meetings?|calls?)\b/,
+  /\b(meetings?|calls?)\b.*\b(this|my)\s+week\b/,
+  /\b(this|my)\s+week\b.*\b(meetings?|calls?)\b/,
+  /\bhow\b.*\bweek\b.*\b(meetings?|calls?)\b/,
+  /\b(meetings?|calls?)\b.*\b(this|my)\s+month\b/,
+  /\b(this|my)\s+month\b.*\b(meetings?|calls?)\b/,
+  /\bhow\b.*\bmonth\b.*\b(meetings?|calls?)\b/,
+  /\b(all|every|entire|whole|full)\b.*\b(meetings?|calls?)\b/,
+  /\b(meetings?|calls?)\b.*\b(all|every|entire|whole|full)\b/,
+];
+
+const CALENDAR_RECAP_LOOKING_PATTERNS = [
+  /\bhow\b.*\b(this|my)\s+week\b/,
+  /\bhow\b.*\bweek\b.*\blooking\b/,
+  /\b(this|my)\s+week\b.*\blooking\b/,
+  /\bwhat\b.*\b(this|my)\s+week\b.*\b(look|like)\b/,
+  /\bhow\b.*\b(this|my)\s+month\b/,
+  /\bhow\b.*\bmonth\b.*\blooking\b/,
+  /\b(this|my)\s+month\b.*\blooking\b/,
+  /\bwhat\b.*\b(this|my)\s+month\b.*\b(look|like)\b/,
+  /\bhow\b.*\b(today|my day|this day)\b/,
+  /\bhow\b.*\bday\b.*\blooking\b/,
+  /\bwhat\b.*\b(today|my day)\b.*\b(look|like)\b/,
+  /\b(schedule|calendar)\b.*\b(this|my)\s+week\b/,
+  /\b(schedule|calendar)\b.*\b(this|my)\s+month\b/,
+  /\bweek\b.*\b(ahead|schedule)\b/,
+  /\bmonth\b.*\b(ahead|schedule)\b/,
+];
+
+function hasMeetingRecapKeyword(normalized) {
+  return /\b(meetings?|calls?)\b/.test(normalized);
+}
+
+function hasCalendarRecapIntent(normalized) {
+  if (hasMeetingRecapKeyword(normalized)) {
+    return true;
+  }
+  return matchesSectionPatterns(normalized, CALENDAR_RECAP_LOOKING_PATTERNS);
+}
+
+function resolveCalendarRecapPeriod(normalized) {
+  const fullPeriod =
+    /\b(all|every|entire|whole|full)\b/.test(normalized) && hasMeetingRecapKeyword(normalized);
+
+  if (
+    /\b(this|my)\s+month\b/.test(normalized) ||
+    /\bmonth\b.*\b(meetings?|calls?)\b/.test(normalized) ||
+    /\b(meetings?|calls?)\b.*\bmonth\b/.test(normalized) ||
+    /\bhow\b.*\bmonth\b/.test(normalized) ||
+    /\bmonth\b.*\b(looking|ahead|schedule)\b/.test(normalized)
+  ) {
+    return { period: "month", fullPeriod };
+  }
+
+  if (
+    /\b(this|my)\s+week\b/.test(normalized) ||
+    /\bweek\b.*\b(meetings?|calls?)\b/.test(normalized) ||
+    /\b(meetings?|calls?)\b.*\bweek\b/.test(normalized) ||
+    /\bhow\b.*\bweek\b/.test(normalized) ||
+    /\bweek\b.*\b(looking|ahead|schedule)\b/.test(normalized)
+  ) {
+    return { period: "week", fullPeriod };
+  }
+
+  if (
+    /\b(today|this day|my day)\b/.test(normalized) ||
+    /\bhow\b.*\bday\b/.test(normalized)
+  ) {
+    return { period: "day", fullPeriod };
+  }
+
+  return { period: "day", fullPeriod };
+}
+
+function matchCalendarRecapCommand(normalized) {
+  if (!hasCalendarRecapIntent(normalized)) {
+    return null;
+  }
+  if (matchesSectionPatterns(normalized, CALENDAR_SECTION_PATTERNS)) {
+    return null;
+  }
+  const matchesExplicit =
+    matchesSectionPatterns(normalized, CALENDAR_RECAP_PATTERNS) ||
+    matchesSectionPatterns(normalized, CALENDAR_RECAP_LOOKING_PATTERNS);
+  if (!matchesExplicit) {
+    return null;
+  }
+  const { period, fullPeriod } = resolveCalendarRecapPeriod(normalized);
+  return { type: "calendar_recap", period, fullPeriod };
+}
+
 const CONTROLS_HIDE_PATTERNS = [
   /^hide(\s+the)?\s+controls?(\s+(panel|menu|bar))?$/,
   /^hide(\s+the)?\s+ui\s+controls?$/,
@@ -503,6 +619,27 @@ const CONTROLS_SHOW_PATTERNS = [
 
 const CONTROLS_TOGGLE_PATTERNS = [
   /^(hide\s*\/\s*show|toggle)(\s+the)?\s+controls?$/,
+];
+
+const DEBUG_MODE_ON_PATTERNS = [
+  /^turn on debug( mode)?$/,
+  /^enable debug( mode)?$/,
+  /^start debug( mode)?$/,
+  /^open debug( mode)?(\s+(panel|view))?$/,
+  /^show debug( mode)?(\s+(panel|view|info|information))?$/,
+  /\b(turn on|enable|start|open|show)\b.*\bdebug( mode)?\b/,
+  /\b(can|could|may|would)\s+(you|i|we)\s+(turn on|enable|start|open|show)\b.*\bdebug\b/,
+];
+
+const DEBUG_MODE_OFF_PATTERNS = [
+  /^turn off debug( mode)?$/,
+  /^disable debug( mode)?$/,
+  /^stop debug( mode)?$/,
+  /^close debug( mode)?(\s+(panel|view))?$/,
+  /^hide debug( mode)?(\s+(panel|view))?$/,
+  /^exit debug( mode)?$/,
+  /\b(turn off|disable|stop|close|hide|exit)\b.*\bdebug( mode)?\b/,
+  /\b(can|could|may|would)\s+(you|i|we)\s+(turn off|disable|stop|close|hide|exit)\b.*\bdebug\b/,
 ];
 
 const CLOSE_PATTERNS = [
@@ -558,6 +695,12 @@ function matchUiCommand(message) {
   if (matchesSectionPatterns(normalized, CONTROLS_SHOW_PATTERNS)) {
     return { type: "controls", action: "show" };
   }
+  if (matchesSectionPatterns(normalized, DEBUG_MODE_ON_PATTERNS)) {
+    return { type: "debug_mode", action: "on" };
+  }
+  if (matchesSectionPatterns(normalized, DEBUG_MODE_OFF_PATTERNS)) {
+    return { type: "debug_mode", action: "off" };
+  }
   if (matchesCloseCommand(message)) {
     return { type: "close" };
   }
@@ -569,6 +712,10 @@ function matchUiCommand(message) {
   }
   if (matchesSectionPatterns(normalized, COMMANDS_SECTION_PATTERNS)) {
     return { type: "section", target: "commands" };
+  }
+  const recapCommand = matchCalendarRecapCommand(normalized);
+  if (recapCommand) {
+    return recapCommand;
   }
   if (matchesSectionPatterns(normalized, CALENDAR_SECTION_PATTERNS)) {
     return { type: "section", target: "calendar" };
@@ -621,12 +768,29 @@ function tryHandleUiCommand(message, source = "ui") {
     }
   }
 
+  if (command.type === "debug_mode") {
+    if (typeof setDebugModeEnabled === "function") {
+      setDebugModeEnabled(command.action === "on");
+    }
+    return true;
+  }
+
   if (command.type === "close") {
     if (isViewSessionActive()) {
       closeViewSession({ reason: source === "voice" ? "voice" : "ui" });
     } else {
       closeOpenUiPanels();
     }
+    return true;
+  }
+
+  if (command.type === "calendar_recap") {
+    if (getDisplayState() === "working") {
+      lastUiCommandResult = null;
+      return false;
+    }
+    lastUiCommandResult = null;
+    void handleCalendarRecap(command, source);
     return true;
   }
 
@@ -649,6 +813,9 @@ function uiCommandStatusMessage(command) {
   }
   if (command.type === "controls") {
     return controlsHidden ? "Controls hidden." : "Controls shown.";
+  }
+  if (command.type === "debug_mode") {
+    return command.action === "on" ? "Debug mode on." : "Debug mode off.";
   }
   if (command.type === "close") {
     return "Closed.";
@@ -1142,6 +1309,7 @@ function renderState() {
   updateEssenceState();
   updateInputLock();
   syncInputActions();
+  syncDebugNanoState();
 }
 
 function resetVoiceListeningMode() {

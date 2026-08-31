@@ -159,12 +159,18 @@ def test_browser_voice_sends_text_to_pi() -> None:
     chat_js = (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
     state_js = (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
     dom_js = (STATIC_DIR / "home-dom.js").read_text(encoding="utf-8")
+    debug_js = (STATIC_DIR / "home-debug.js").read_text(encoding="utf-8")
     activity_js = _load_home_js()
 
     assert "startWakeWordRecognition" in voice_js
     assert "extractVoiceCommandForSubmit" in voice_js
     assert "resolvePendingVoiceMessage" in voice_js
     assert "WAKE_WORD_PATTERN" in voice_js
+    assert "WAKE_NAME_ONLY_PATTERN" in voice_js
+    assert "WAKE_NAME_PREFIX_PATTERN" in voice_js
+    assert "matchWakeWordPrefix" in voice_js
+    assert "WAKE_NAME_ALIAS_PATTERNS" in voice_js
+    assert "nanna" in voice_js
     assert "handleVoiceTranscript" in voice_js
     assert "connectBrowserMicrophone" in voice_js
     assert 'nanoFetch("/api/voice/transcribe"' not in voice_js
@@ -182,14 +188,14 @@ def test_browser_voice_sends_text_to_pi() -> None:
     assert "isWakeWordOnlyMessage" in voice_js
     assert "waitingForWakeCommand" in state_js
     assert "isVoiceRecognitionSupported" in voice_js
-    assert "tryInterimWakeWord" in voice_js
+    assert "handleVoiceInterim" in voice_js
     assert "schedulePendingVoiceSubmit" in voice_js
     assert "flushPendingVoiceSubmit" in voice_js
     assert "PENDING_VOICE_DEBOUNCE_MS" in voice_js
     assert "mergeVoiceTranscript" in voice_js
     assert "pendingVoiceBuffer" in voice_js
     assert "updatePendingVoiceBuffer" in voice_js
-    try_interim_fn = voice_js.split("function tryInterimWakeWord", 1)[1].split(
+    try_interim_fn = voice_js.split("function handleVoiceInterim", 1)[1].split(
         "function releaseMicrophone",
         1,
     )[0]
@@ -212,12 +218,17 @@ def test_browser_voice_sends_text_to_pi() -> None:
     )[0]
     assert "clearPendingVoiceBuffer" in ensure_listen_fn
     assert "shouldKeepRecognitionAliveDuringSubmit" in voice_js
+    assert "attemptResumeWakeWordListening" in voice_js
+    assert "restartWakeWordListening" in voice_js
+    assert "clearDebugVoiceCapture" in debug_js
     assert "ensureWakeWordListeningActive" in voice_js
     assert "MOBILE_RECOGNITION_RESTART_MIN_MS" in voice_js
     assert "connectBrowserMicrophoneIfEnabled" in voice_js
     assert "fromGesture" in voice_js
     assert "ensureMicrophonePermission" not in voice_js
-    assert "getUserMedia" not in voice_js
+    assert "getUserMedia" in voice_js
+    assert "voiceInputStream" in voice_js
+    assert "stopVoiceInputStream" in voice_js
     assert 'source !== "voice"' in chat_js.split("async function submitMessage", 1)[1].split("if (isSystemCommandId", 1)[0]
 
 
@@ -646,6 +657,126 @@ def test_voice_mode_is_ui_toggle_only() -> None:
     assert "resumeWakeWordListening" in voice_js
     assert "voice-push-toggle" not in html_text
     assert "pushToTalkActive" not in voice_js
+
+
+def test_debug_panel_integration() -> None:
+    html_text = _load_index_html()
+    modules = json.loads((STATIC_DIR / "home-modules.json").read_text(encoding="utf-8"))
+    debug_js = (STATIC_DIR / "home-debug.js").read_text(encoding="utf-8")
+    dom_js = (STATIC_DIR / "home-dom.js").read_text(encoding="utf-8")
+    state_js = (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
+    bootstrap_js = (STATIC_DIR / "home-bootstrap.js").read_text(encoding="utf-8")
+    css_text = _load_home_css()
+
+    assert "home-debug.js" in modules
+    ui_index = modules.index("home-ui.js")
+    debug_index = modules.index("home-debug.js")
+    assert debug_index == ui_index + 1
+    assert 'id="nano-debug-panel"' in html_text
+    assert "nanoDebugPanel" in dom_js
+    assert "DEBUG_MODE_STORAGE_KEY" in state_js
+    assert "debugModeEnabled" in state_js
+    assert "initDebugControl" in debug_js
+    assert "syncDebugNanoState" in debug_js
+    assert "data-debug-field" in html_text
+    assert 'id="debug-mode-on"' in html_text
+    assert "initDebugControl" in bootstrap_js
+    assert ".nano-debug-panel" in css_text
+    assert "updateDebugVoiceRecognition" in debug_js
+    ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+    assert "DEBUG_MODE_ON_PATTERNS" in ui_js
+    assert "DEBUG_MODE_OFF_PATTERNS" in ui_js
+    assert '"debug_mode"' in ui_js
+    assert "setDebugModeEnabled" in ui_js
+    assert "debug_mode_on" in ui_js
+    assert "debug_mode_off" in ui_js
+
+
+def test_calendar_recap_integration() -> None:
+    html_text = _load_index_html()
+    modules = json.loads((STATIC_DIR / "home-modules.json").read_text(encoding="utf-8"))
+    recap_js = (STATIC_DIR / "home-calendar-recap.js").read_text(encoding="utf-8")
+    calendar_js = (STATIC_DIR / "home-calendar.js").read_text(encoding="utf-8")
+    ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+    dom_js = (STATIC_DIR / "home-dom.js").read_text(encoding="utf-8")
+    css_text = _load_home_css()
+
+    assert "home-calendar-recap.js" in modules
+    calendar_index = modules.index("home-calendar.js")
+    reminders_index = modules.index("home-meeting-reminders.js")
+    recap_index = modules.index("home-calendar-recap.js")
+    assert reminders_index == calendar_index + 1
+    assert recap_index == reminders_index + 1
+    assert 'id="meeting-recap-modals"' in html_text
+    assert "meetingRecapModals" in dom_js
+    assert "CALENDAR_RECAP_PATTERNS" in ui_js
+    assert "CALENDAR_RECAP_LOOKING_PATTERNS" in ui_js
+    assert "hasCalendarRecapIntent" in ui_js
+    assert "calendar_recap" in ui_js
+    assert "handleCalendarRecap" in recap_js
+    assert "formatSpeechClockTime" in calendar_js
+    assert "formatSpeechDayPeriod" in calendar_js
+    format_speech_fn = calendar_js.split("function formatSpeechDayPeriod", 1)[1].split(
+        "function formatEventTimeForSpeech",
+        1,
+    )[0]
+    assert " AM" not in format_speech_fn
+    assert " PM" not in format_speech_fn
+    assert "in the morning" in format_speech_fn
+    assert "formatMeetingSpeechLine" in calendar_js
+    assert "formatSpeechWeekday" in calendar_js
+    assert "formatSpeechDuration" in calendar_js
+    assert "buildImminentSpeechLead" in recap_js
+    assert "isSameCalendarEvent" in recap_js
+    assert "MEETING_RECAP_AUTO_CLOSE_MS" in recap_js
+    assert "300000" in recap_js
+    assert "showMeetingRecapModals" in recap_js
+    assert "formatTimeUntilEvent" in recap_js
+    assert "calendarDaysUntilEvent" in recap_js
+    assert "calendar-event-detail-until" in recap_js
+    assert "resolveEventContactEmail" in calendar_js
+    assert "organizer_email" in calendar_js
+    assert "calendar-event-detail-email" in recap_js
+    assert "eventSpeechTitle" not in recap_js
+    assert "calendar-event-detail-until" in css_text
+    assert "calendar_recap_today" in ui_js
+    assert ".meeting-recap-modals" in css_text
+
+
+def test_meeting_reminders_integration() -> None:
+    modules = json.loads((STATIC_DIR / "home-modules.json").read_text(encoding="utf-8"))
+    reminders_js = (STATIC_DIR / "home-meeting-reminders.js").read_text(encoding="utf-8")
+    state_js = (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
+    bootstrap_js = (STATIC_DIR / "home-bootstrap.js").read_text(encoding="utf-8")
+    calendar_js = (STATIC_DIR / "home-calendar.js").read_text(encoding="utf-8")
+    recap_js = (STATIC_DIR / "home-calendar-recap.js").read_text(encoding="utf-8")
+    css_text = _load_home_css()
+    api_doc = (ROOT_DIR / "docs" / "meeting-reminders-api.md").read_text(encoding="utf-8")
+
+    assert "home-meeting-reminders.js" in modules
+    assert "MEETING_REMINDER_STORAGE_KEY" in state_js
+    assert "MEETING_REMINDER_STORAGE_KEY" in reminders_js
+    assert "initMeetingReminders" in reminders_js
+    assert "createMeetingReminderControl" in reminders_js
+    assert "refreshMeetingRemindersFromServer" in reminders_js
+    assert "meetingRemindersCache" in reminders_js
+    assert "handleMeetingReminderActivityEvent" in reminders_js
+    assert "loadMeetingReminders" in reminders_js
+    assert "saveMeetingReminder" in reminders_js
+    assert "removeMeetingReminder" in reminders_js
+    assert "/api/calendar/meeting-reminders" in reminders_js
+    assert "persistMeetingReminders" not in reminders_js
+    assert "rescheduleMeetingReminders" not in reminders_js
+    assert "void initMeetingReminders" in bootstrap_js
+    assert "handleMeetingReminderActivityEvent" in (STATIC_DIR / "home-events.js").read_text(encoding="utf-8")
+    assert "createMeetingReminderControl" in calendar_js
+    assert "createMeetingReminderControl" in recap_js
+    assert "hasActiveMeetingReminder" in reminders_js
+    assert "calendar-event-chip--remind" in calendar_js
+    assert "chip.dataset.eventKey" in calendar_js
+    assert "meeting-reminder-control" in css_text
+    assert "/api/calendar/meeting-reminders" in api_doc
+    assert "lead_minutes" in api_doc
 
 
 def test_voice_mode_toggle_integration() -> None:

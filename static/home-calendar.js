@@ -27,6 +27,15 @@ const CALENDAR_COPY = {
     loadingDefault: "SYNCING CALENDAR",
     loadingDetail: "fetching events...",
     closeDay: "Close",
+    eventEmail: "Email",
+    remindLabel: "Remind",
+    remindOff: "Off",
+    remind15: "15m",
+    remind30: "30m",
+    remind1h: "1h",
+    remindStatus15: "Reminder: 15 min before",
+    remindStatus30: "Reminder: 30 min before",
+    remindStatus1h: "Reminder: 1 hour before",
   },
   fi: {
     month: "Kuukausi",
@@ -52,6 +61,15 @@ const CALENDAR_COPY = {
     loadingDefault: "SYNKATAAN KALENTERIA",
     loadingDetail: "haetaan tapahtumia...",
     closeDay: "Sulje",
+    eventEmail: "Sähköposti",
+    remindLabel: "Muistutus",
+    remindOff: "Pois",
+    remind15: "15 min",
+    remind30: "30 min",
+    remind1h: "1 t",
+    remindStatus15: "Muistutus: 15 min ennen",
+    remindStatus30: "Muistutus: 30 min ennen",
+    remindStatus1h: "Muistutus: 1 t ennen",
   },
 };
 
@@ -598,9 +616,19 @@ function renderMonthGrid() {
     chips.className = "calendar-day-chips";
     const visibleEvents = dayEvents.slice(0, 2);
     for (const event of visibleEvents) {
-      const chip = document.createElement("span");
+      const chip = document.createElement("button");
+      chip.type = "button";
       chip.className = "calendar-event-chip";
+      const eventKey = buildMeetingReminderKey(event);
+      if (eventKey) {
+        chip.dataset.eventKey = eventKey;
+      }
+      chip.classList.toggle("calendar-event-chip--remind", hasActiveMeetingReminder(event));
       chip.textContent = event.summary;
+      chip.addEventListener("click", (clickEvent) => {
+        clickEvent.stopPropagation();
+        openCalendarEventPanel(event, dayKey, clickEvent.currentTarget);
+      });
       chips.appendChild(chip);
     }
     if (dayEvents.length > 2) {
@@ -750,6 +778,120 @@ function renderCalendarGrid() {
   }
 }
 
+function formatSpeechDayPeriod(hours24, minutes) {
+  if (hours24 === 0 && minutes === 0) {
+    return "midnight";
+  }
+  if (hours24 === 12 && minutes === 0) {
+    return "noon";
+  }
+  if (hours24 >= 5 && hours24 < 12) {
+    return "in the morning";
+  }
+  if (hours24 >= 12 && hours24 < 18) {
+    return "in the afternoon";
+  }
+  if (hours24 >= 18 && hours24 < 22) {
+    return "in the evening";
+  }
+  return "at night";
+}
+
+function formatSpeechWeekday(date) {
+  if (!date) {
+    return "";
+  }
+  return new Intl.DateTimeFormat(calendarLocaleTag(), { weekday: "long" }).format(date);
+}
+
+function formatSpeechClockTime(date) {
+  if (!date) {
+    return "";
+  }
+  const hours24 = date.getHours();
+  const minutes = date.getMinutes();
+  const period = formatSpeechDayPeriod(hours24, minutes);
+  if (period === "midnight" || period === "noon") {
+    return period;
+  }
+  const hours12 = hours24 % 12 || 12;
+
+  if (minutes === 0) {
+    return `${hours12} ${period}`;
+  }
+  if (minutes < 10) {
+    return `${hours12} oh ${minutes} ${period}`;
+  }
+  return `${hours12} ${minutes} ${period}`;
+}
+
+function formatSpeechDuration(start, end) {
+  if (!start || !end) {
+    return null;
+  }
+  const totalMinutes = Math.round((end.getTime() - start.getTime()) / 60000);
+  if (totalMinutes <= 0) {
+    return null;
+  }
+  if (totalMinutes < 60) {
+    return `${totalMinutes} minute${totalMinutes === 1 ? "" : "s"}`;
+  }
+  const hours = Math.floor(totalMinutes / 60);
+  const remainder = totalMinutes % 60;
+  if (remainder === 0) {
+    return `${hours} hour${hours === 1 ? "" : "s"}`;
+  }
+  return `${hours} hour${hours === 1 ? "" : "s"} ${remainder} minute${remainder === 1 ? "" : "s"}`;
+}
+
+function formatMeetingSpeechLine(event, options = {}) {
+  const includeWeekday = Boolean(options.includeWeekday);
+  if (event.all_day) {
+    const start = parseEventDate(event.start);
+    if (includeWeekday && start) {
+      return `On ${formatSpeechWeekday(start)}, meeting is all day`;
+    }
+    return "Meeting is all day";
+  }
+
+  const start = parseEventDate(event.start);
+  const end = parseEventDate(event.end);
+  if (!start) {
+    return "Meeting time unavailable";
+  }
+
+  const startSpeech = formatSpeechClockTime(start);
+  const duration = end ? formatSpeechDuration(start, end) : null;
+  let line = duration
+    ? `Meeting is from ${startSpeech} and lasts ${duration}`
+    : `Meeting starts at ${startSpeech}`;
+
+  if (includeWeekday) {
+    line = `On ${formatSpeechWeekday(start)}, ${line.charAt(0).toLowerCase()}${line.slice(1)}`;
+  }
+  return line;
+}
+
+function formatEventTimeForSpeech(event) {
+  if (event.all_day) {
+    return calendarCopy().allDay;
+  }
+  const start = parseEventDate(event.start);
+  const end = parseEventDate(event.end);
+  if (!start) {
+    return "";
+  }
+  const startLabel = formatSpeechClockTime(start);
+  if (!end) {
+    return startLabel;
+  }
+  const endLabel = formatSpeechClockTime(end);
+  if (startLabel === endLabel) {
+    return startLabel;
+  }
+  return `${startLabel} to ${endLabel}`;
+}
+
 function formatEventTime(event) {
   if (event.all_day) {
     return calendarCopy().allDay;
@@ -764,6 +906,18 @@ function formatEventTime(event) {
     return startLabel;
   }
   return `${startLabel} – ${calendarTimeFormatter.format(end)}`;
+}
+
+function resolveEventContactEmail(event) {
+  const organizerEmail = String(event?.organizer_email || "").trim();
+  if (organizerEmail) {
+    return organizerEmail;
+  }
+  const calendarId = String(event?.calendar_id || "").trim();
+  if (calendarId.includes("@")) {
+    return calendarId;
+  }
+  return "";
 }
 
 function isSafeHttpUrl(value) {
@@ -873,6 +1027,11 @@ function buildCalendarEventListItem(event) {
   main.append(time, title);
   item.appendChild(main);
 
+  const reminderControl = createMeetingReminderControl(event);
+  if (reminderControl) {
+    item.appendChild(reminderControl);
+  }
+
   if (event.html_link) {
     item.appendChild(createGoogleCalendarEventLink(event.html_link));
   }
@@ -922,6 +1081,12 @@ function openCalendarEventPanel(event, dateKey, trigger) {
   timeLine.textContent = formatEventTime(event);
 
   detail.append(dateLine, timeLine);
+
+  const reminderControl = createMeetingReminderControl(event);
+  if (reminderControl) {
+    detail.appendChild(reminderControl);
+  }
+
   calendarDayEvents.appendChild(detail);
 
   showCalendarDayModal();

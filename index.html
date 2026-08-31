@@ -82,6 +82,40 @@ aria-controls="view-modal-panel"
 
 <div id="active-stopwatches" class="active-stopwatches" hidden aria-live="polite"></div>
 
+<div id="meeting-recap-modals" class="meeting-recap-modals" hidden aria-live="polite"></div>
+
+<div id="nano-debug-panel" class="nano-debug-panel" hidden aria-live="polite">
+<p class="nano-debug-title">Debug</p>
+
+<section class="nano-debug-section" aria-label="Nano state">
+<h3 class="nano-debug-section-title">Nano state</h3>
+<dl class="nano-debug-fields">
+<div class="nano-debug-field"><dt>Display</dt><dd data-debug-field="state-display">—</dd></div>
+<div class="nano-debug-field"><dt>Activity</dt><dd data-debug-field="activity-state">—</dd></div>
+<div class="nano-debug-field"><dt>Headline</dt><dd data-debug-field="activity-headline">—</dd></div>
+<div class="nano-debug-field"><dt>View</dt><dd data-debug-field="view-session">—</dd></div>
+<div class="nano-debug-field"><dt>Request</dt><dd data-debug-field="request-in-flight">—</dd></div>
+<div class="nano-debug-field"><dt>Speaking</dt><dd data-debug-field="speaking">—</dd></div>
+</dl>
+</section>
+
+<section class="nano-debug-section" aria-label="Voice">
+<h3 class="nano-debug-section-title">Voice</h3>
+<dl class="nano-debug-fields">
+<div class="nano-debug-field"><dt>Mode</dt><dd data-debug-field="voice-mode">—</dd></div>
+<div class="nano-debug-field"><dt>Microphone</dt><dd data-debug-field="microphone">—</dd></div>
+<div class="nano-debug-field"><dt>Wake armed</dt><dd data-debug-field="wake-armed">—</dd></div>
+<div class="nano-debug-field"><dt>Follow-up</dt><dd data-debug-field="follow-up">—</dd></div>
+<div class="nano-debug-field"><dt>Presence</dt><dd data-debug-field="presence">—</dd></div>
+<div class="nano-debug-field"><dt>Live</dt><dd class="nano-debug-value--live" data-debug-field="voice-live">—</dd></div>
+<div class="nano-debug-field"><dt>Final</dt><dd class="nano-debug-value--final" data-debug-field="voice-final">—</dd></div>
+<div class="nano-debug-field"><dt>Buffer</dt><dd class="nano-debug-value--buffer" data-debug-field="voice-buffer">—</dd></div>
+<div class="nano-debug-field"><dt>Submitted</dt><dd class="nano-debug-value--submitted" data-debug-field="voice-submitted">—</dd></div>
+</dl>
+</section>
+
+</div>
+
 <section class="essence-zone" aria-hidden="true">
 
 <div id="task-wait-timer" class="task-wait-timer" hidden aria-live="polite">
@@ -377,6 +411,13 @@ value="80"
 <div class="voice-mode-toggle" role="group" aria-label="Voice mode">
 <button id="voice-mode-off" class="voice-mode-btn active" type="button" aria-pressed="true">Off</button>
 <button id="voice-mode-on" class="voice-mode-btn" type="button" aria-pressed="false">On</button>
+</div>
+</div>
+<div class="commands-debug-mode">
+<span class="voice-volume-label">Debug mode</span>
+<div class="voice-mode-toggle" role="group" aria-label="Debug mode">
+<button id="debug-mode-off" class="voice-mode-btn active" type="button" aria-pressed="true">Off</button>
+<button id="debug-mode-on" class="voice-mode-btn" type="button" aria-pressed="false">On</button>
 </div>
 </div>
 <p id="voice-support-notice" class="voice-support-notice" hidden></p>

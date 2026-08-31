@@ -158,14 +158,100 @@ function resolveVoiceRecognitionErrorMessage(errorCode) {
 
 function reportVoiceRecognitionError(errorCode) {
   const message = resolveVoiceRecognitionErrorMessage(errorCode);
-  microphoneReady = false;
+  if (
+    errorCode === "not-allowed" ||
+    errorCode === "service-not-allowed" ||
+    errorCode === "audio-capture"
+  ) {
+    stopVoiceInputStream();
+    microphoneReady = false;
+  }
   setVoiceSupportNotice(message);
   setVoiceStatus(message);
   renderState();
 }
 
-const WAKE_WORD_PATTERN = /\b(?:hey|hay|hi)\s*,?\s*(?:nano|nanno|nana|nah no|na no)\b/i;
-const WAKE_FRAGMENT_PATTERN = /^(?:hey|hay|hi|nano|nanno|nana|nah no|na no)$/i;
+function isVoiceInputStreamActive() {
+  if (!voiceInputStream) {
+    return false;
+  }
+  return voiceInputStream
+    .getAudioTracks()
+    .some((track) => track.readyState === "live" && track.enabled);
+}
+
+function stopVoiceInputStream() {
+  if (!voiceInputStream) {
+    return;
+  }
+  for (const track of voiceInputStream.getTracks()) {
+    track.stop();
+  }
+  voiceInputStream = null;
+}
+
+async function ensureVoiceInputStream() {
+  if (isVoiceInputStreamActive()) {
+    return true;
+  }
+  stopVoiceInputStream();
+  if (!navigator.mediaDevices?.getUserMedia) {
+    reportVoiceRecognitionError("audio-capture");
+    return false;
+  }
+  try {
+    voiceInputStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    microphoneReady = true;
+    return true;
+  } catch (error) {
+    const name = String(error?.name || "");
+    if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+      reportVoiceRecognitionError("not-allowed");
+      return false;
+    }
+    reportVoiceRecognitionError("audio-capture");
+    return false;
+  }
+}
+
+const WAKE_GREETINGS = ["hey", "hay", "hi"];
+const WAKE_NAME_ALIAS_PATTERNS = [
+  "nano",
+  "nanno",
+  "nana",
+  "nanna",
+  "neno",
+  "nono",
+  "nah\\s+no",
+  "na\\s+no",
+  "no\\s+no",
+  "na\\s+nah",
+  "nay\\s+no",
+];
+const WAKE_GREETING_PATTERN = WAKE_GREETINGS.join("|");
+const WAKE_NAME_PATTERN = WAKE_NAME_ALIAS_PATTERNS.join("|");
+const WAKE_WORD_PATTERN = new RegExp(
+  `\\b(?:${WAKE_GREETING_PATTERN})\\s*,?\\s*(?:${WAKE_NAME_PATTERN})\\b`,
+  "i",
+);
+const WAKE_NAME_ONLY_PATTERN = new RegExp(`^(?:${WAKE_NAME_PATTERN})$`, "i");
+const WAKE_NAME_PREFIX_PATTERN = new RegExp(`^(?:${WAKE_NAME_PATTERN})\\b`, "i");
+const WAKE_FRAGMENT_PATTERN = new RegExp(
+  `^(?:${WAKE_GREETING_PATTERN}|${WAKE_NAME_PATTERN})$`,
+  "i",
+);
+
+function matchWakeWordPrefix(text) {
+  const trimmed = (text || "").trim();
+  if (!trimmed) {
+    return null;
+  }
+  const greetingMatch = trimmed.match(WAKE_WORD_PATTERN);
+  if (greetingMatch) {
+    return greetingMatch;
+  }
+  return trimmed.match(WAKE_NAME_PREFIX_PATTERN);
+}
 const VOICE_SEGMENT_BUFFER_MS = 3500;
 const VOICE_RECOGNITION_LANG = "en-US";
 const WAKE_COMMAND_GRACE_MS = 800;
@@ -173,6 +259,7 @@ const PENDING_VOICE_DEBOUNCE_MS = 900;
 const MOBILE_RECOGNITION_RESTART_MIN_MS = 2500;
 
 let wakeWordRecognition = null;
+let voiceInputStream = null;
 let recognitionPaused = false;
 let wakeWordRestartTimer = null;
 let pendingVoiceSubmitTimer = null;
@@ -218,7 +305,7 @@ function ensureWakeWordListeningActive() {
     return;
   }
   if (!wakeWordRecognition) {
-    startWakeWordRecognition();
+    attemptResumeWakeWordListening();
   }
 }
 
@@ -231,6 +318,7 @@ function resetWakeCommandWindow() {
 
 function clearPendingVoiceBuffer() {
   pendingVoiceBuffer = "";
+  syncDebugVoiceBuffer("");
 }
 
 function mergeVoiceTranscript(previous, next) {
@@ -274,6 +362,7 @@ function mergeVoiceTranscript(previous, next) {
 
 function updatePendingVoiceBuffer(transcript) {
   pendingVoiceBuffer = mergeVoiceTranscript(pendingVoiceBuffer, transcript);
+  syncDebugVoiceBuffer(pendingVoiceBuffer);
 }
 
 function clearPendingVoiceSubmit() {
@@ -296,7 +385,7 @@ function extractVoiceCommandForSubmit(text) {
   if (!trimmed) {
     return null;
   }
-  const match = trimmed.match(WAKE_WORD_PATTERN);
+  const match = matchWakeWordPrefix(trimmed);
   if (!match) {
     return null;
   }
@@ -313,7 +402,7 @@ function resolvePendingVoiceMessage(merged) {
     return null;
   }
   if (acceptsVoiceWithoutWakeWord()) {
-    const wakeMatch = text.match(WAKE_WORD_PATTERN);
+    const wakeMatch = matchWakeWordPrefix(text);
     if (wakeMatch) {
       return textAfterWakeWord(text, wakeMatch) || null;
     }
@@ -330,7 +419,10 @@ function isWakeWordOnlyUtterance(text) {
   if (!trimmed) {
     return false;
   }
-  const match = trimmed.match(WAKE_WORD_PATTERN);
+  if (WAKE_NAME_ONLY_PATTERN.test(trimmed)) {
+    return true;
+  }
+  const match = matchWakeWordPrefix(trimmed);
   if (!match) {
     return false;
   }
@@ -378,6 +470,7 @@ async function flushPendingVoiceSubmit() {
   if (shouldIgnoreDuplicateVoiceMessage(message)) {
     return;
   }
+  updateDebugVoiceSubmitted(message);
   clearPendingVoiceSubmit();
   clearPendingVoiceBuffer();
   if (wakeCommandArmed) {
@@ -416,7 +509,7 @@ function normalizeArmedVoiceCommand(text) {
   if (!trimmed) {
     return null;
   }
-  const wakeMatch = trimmed.match(WAKE_WORD_PATTERN);
+  const wakeMatch = matchWakeWordPrefix(trimmed);
   if (wakeMatch) {
     const afterWake = textAfterWakeWord(trimmed, wakeMatch);
     return afterWake || null;
@@ -488,7 +581,7 @@ function isWakeWordOnlyMessage(text) {
   if (WAKE_FRAGMENT_PATTERN.test(trimmed)) {
     return true;
   }
-  const match = trimmed.match(WAKE_WORD_PATTERN);
+  const match = matchWakeWordPrefix(trimmed);
   if (!match) {
     return false;
   }
@@ -531,9 +624,6 @@ function shouldPauseWakeWordListening() {
   if (requestInFlight || speakingActive) {
     return true;
   }
-  if (typeof getDisplayState === "function" && getDisplayState() === "working") {
-    return true;
-  }
   return false;
 }
 
@@ -557,9 +647,22 @@ function stopWakeWordRecognition() {
   wakeWordRecognition = null;
 }
 
+function attemptResumeWakeWordListening() {
+  if (!voiceModeEnabled) {
+    return;
+  }
+  if (shouldPauseWakeWordListening()) {
+    scheduleWakeWordRestart(500);
+    return;
+  }
+  if (!startWakeWordRecognition()) {
+    scheduleWakeWordRestart(800);
+  }
+}
+
 function scheduleWakeWordRestart(delayMs = 300) {
   clearWakeWordRestartTimer();
-  if (shouldPauseWakeWordListening()) {
+  if (!voiceModeEnabled) {
     return;
   }
   if (isCoarsePointerDevice()) {
@@ -573,7 +676,7 @@ function scheduleWakeWordRestart(delayMs = 300) {
   }
   wakeWordRestartTimer = window.setTimeout(() => {
     wakeWordRestartTimer = null;
-    startWakeWordRecognition();
+    attemptResumeWakeWordListening();
   }, delayMs);
 }
 
@@ -594,7 +697,10 @@ function startWakeWordRecognition() {
 
   recognition.onstart = () => {
     lastRecognitionStartAt = Date.now();
-    microphoneReady = true;
+    if (isVoiceInputStreamActive() || !microphoneReady) {
+      microphoneReady = true;
+    }
+    clearDebugVoiceCapture();
     if (!isVoiceStatusOverridden()) {
       setVoiceStatus(resolveVoiceModeStatusText());
     }
@@ -602,6 +708,9 @@ function startWakeWordRecognition() {
   };
 
   recognition.onresult = (event) => {
+    if (speakingActive || requestInFlight) {
+      return;
+    }
     let pendingFinal = "";
     let pendingInterim = "";
     for (let index = event.resultIndex; index < event.results.length; index += 1) {
@@ -616,12 +725,14 @@ function startWakeWordRecognition() {
         pendingInterim = pendingInterim ? `${pendingInterim} ${transcript}` : transcript;
       }
     }
+    if (pendingFinal || pendingInterim) {
+      updateDebugVoiceRecognition({ interim: pendingInterim, finalChunk: pendingFinal });
+    }
     if (pendingFinal) {
       void handleVoiceTranscript(pendingFinal);
-      return;
     }
     if (pendingInterim) {
-      tryInterimWakeWord(pendingInterim);
+      handleVoiceInterim(pendingInterim);
     }
   };
 
@@ -670,6 +781,17 @@ function startWakeWordRecognition() {
 function pauseWakeWordListening() {
   recognitionPaused = true;
   stopWakeWordRecognition();
+  clearDebugVoiceCapture();
+}
+
+function restartWakeWordListening() {
+  if (!voiceModeEnabled) {
+    return;
+  }
+  recognitionPaused = false;
+  clearWakeWordRestartTimer();
+  stopWakeWordRecognition();
+  scheduleWakeWordRestart(120);
 }
 
 function resumeWakeWordListening() {
@@ -677,29 +799,26 @@ function resumeWakeWordListening() {
   if (!voiceModeEnabled) {
     return;
   }
-  if (shouldPauseWakeWordListening()) {
-    scheduleWakeWordRestart(500);
-    return;
-  }
-  startWakeWordRecognition();
+  restartWakeWordListening();
 }
 
-function tryInterimWakeWord(transcript) {
-  if (!isCoarsePointerDevice()) {
-    return;
-  }
+function tryWakeWordOnInterim(transcript) {
   const text = (transcript || "").trim();
   if (!text || acceptsVoiceWithoutWakeWord() || requestInFlight || speakingActive) {
-    return;
+    return false;
   }
   const now = Date.now();
   if (text === lastInterimWakeCheck.text && now - lastInterimWakeCheck.at < 1200) {
-    return;
+    return false;
   }
   lastInterimWakeCheck = { text, at: now };
 
   for (const candidate of voiceTranscriptCandidates(text)) {
-    if (!WAKE_WORD_PATTERN.test(candidate)) {
+    const trimmedCandidate = candidate.trim();
+    if (
+      !matchWakeWordPrefix(candidate) &&
+      !WAKE_NAME_ONLY_PATTERN.test(trimmedCandidate)
+    ) {
       continue;
     }
     if (!wakeCommandArmed) {
@@ -707,12 +826,55 @@ function tryInterimWakeWord(transcript) {
       acknowledgeWakeWordOnly();
       clearPendingVoiceBuffer();
     }
+    return true;
+  }
+  return false;
+}
+
+function shouldCaptureInterimVoice(text) {
+  if (!text) {
+    return false;
+  }
+  if (acceptsVoiceWithoutWakeWord()) {
+    return true;
+  }
+  if (wakeCommandArmed) {
+    return true;
+  }
+  if (matchWakeWordPrefix(text)) {
+    return true;
+  }
+  if (WAKE_NAME_ONLY_PATTERN.test(text.trim())) {
+    return true;
+  }
+  return WAKE_FRAGMENT_PATTERN.test(text);
+}
+
+function handleVoiceInterim(transcript) {
+  const text = (transcript || "").trim();
+  if (!text) {
     return;
   }
+  tryWakeWordOnInterim(text);
+  if (requestInFlight || speakingActive) {
+    return;
+  }
+  if (!shouldCaptureInterimVoice(text)) {
+    return;
+  }
+  updatePendingVoiceBuffer(text);
+  detectWakeWordOnBuffer();
+  if (wakeCommandArmed && Date.now() > wakeCommandArmedUntil) {
+    resetWakeCommandWindow();
+    clearPendingVoiceBuffer();
+    return;
+  }
+  schedulePendingVoiceSubmit();
 }
 
 function releaseMicrophone() {
   pauseWakeWordListening();
+  stopVoiceInputStream();
   clearPendingVoiceSubmit();
   clearPendingVoiceBuffer();
   resetWakeCommandWindow();
@@ -736,6 +898,10 @@ async function connectBrowserMicrophone() {
   }
   recognitionPaused = false;
   setVoiceSupportNotice("");
+  const streamReady = await ensureVoiceInputStream();
+  if (!streamReady) {
+    return false;
+  }
   if (startWakeWordRecognition()) {
     return true;
   }
@@ -1058,7 +1224,7 @@ async function playVoiceNow(text, options = {}) {
     updateEssenceState();
     clearVoiceSource();
     resumeAnswerClearAfterSpeech();
-    resumeWakeWordListening();
+    restartWakeWordListening();
   }
 }
 
@@ -1194,6 +1360,19 @@ function armVoiceFollowUp(text, { yesNo = false, inputKind = null } = {}) {
   syncInputActions();
 }
 
+function resetLocalActivityAfterVoiceResponse() {
+  if (requestInFlight) {
+    return;
+  }
+  if (currentActivitySnapshot.state === "working") {
+    currentActivitySnapshot = {
+      ...currentActivitySnapshot,
+      state: "standby",
+      detail: null,
+    };
+  }
+}
+
 function returnToWakeDetection() {
   waitingForVoiceAnswer = false;
   waitingForFollowUp = false;
@@ -1202,13 +1381,18 @@ function returnToWakeDetection() {
   currentAnswerPendingKind = null;
   currentPendingSnapshot = null;
   currentInputKind = null;
+  suppressPendingRearm = false;
   clearPendingVoiceSubmit();
   clearPendingVoiceBuffer();
   resetWakeCommandWindow();
+  clearRecentVoiceSegments();
+  lastInterimWakeCheck = { text: "", at: 0 };
   syncInputActions();
+  resetLocalActivityAfterVoiceResponse();
+  clearDebugVoiceCapture();
   if (voiceModeEnabled) {
     setVoiceStatus(resolveVoiceModeStatusText());
-    resumeWakeWordListening();
+    restartWakeWordListening();
   } else {
     setVoiceStatus(voiceIdleStatusMessage());
   }

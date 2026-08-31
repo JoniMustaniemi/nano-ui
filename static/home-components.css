@@ -473,6 +473,103 @@ body.inputs-locked .bottom-bar-btn:disabled {
   cursor: not-allowed;
 }
 
+.commands-debug-mode {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.nano-debug-panel {
+  position: fixed;
+  left: max(12px, calc(env(safe-area-inset-left, 0) + 10px));
+  bottom: max(48px, calc(env(safe-area-inset-bottom, 0) + 40px));
+  z-index: 28;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(100vw - 24px, 340px);
+  padding: 0;
+  background: transparent;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.nano-debug-panel[hidden] {
+  display: none !important;
+}
+
+.nano-debug-title {
+  margin: 0;
+  color: var(--accent-strong);
+  font: 700 0.68rem/1.2 "Cascadia Mono", "Consolas", monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.nano-debug-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nano-debug-section-title {
+  margin: 0;
+  color: var(--accent-soft);
+  font: 700 0.62rem/1.2 "Cascadia Mono", "Consolas", monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.nano-debug-fields {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nano-debug-field {
+  display: grid;
+  grid-template-columns: minmax(72px, 34%) 1fr;
+  gap: 8px;
+  align-items: start;
+}
+
+.nano-debug-field dt {
+  margin: 0;
+  color: var(--text-muted);
+  font: 600 0.6rem/1.35 "Cascadia Mono", "Consolas", monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.nano-debug-field dd {
+  margin: 0;
+  min-height: 1.1em;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 500 0.72rem/1.35 "Cascadia Mono", "Consolas", monospace;
+  color: #f4efe6;
+}
+
+.nano-debug-value--live {
+  color: rgba(196, 220, 208, 0.78);
+  font-style: italic;
+}
+
+.nano-debug-value--final {
+  color: var(--accent-soft);
+}
+
+.nano-debug-value--buffer {
+  color: rgba(244, 193, 93, 0.9);
+}
+
+.nano-debug-value--submitted {
+  color: #f4efe6;
+}
+
 .voice-support-notice {
   margin: 0;
   color: var(--warning);
@@ -1205,6 +1302,18 @@ body.inputs-locked .bottom-bar-btn:disabled {
 .calendar-event-chip {
   background: rgba(57, 255, 20, 0.12);
   color: var(--accent-soft);
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+
+.calendar-event-chip--remind {
+  box-shadow: inset 0 0 0 1px rgba(57, 255, 20, 0.38);
+}
+
+.calendar-event-chip:hover {
+  background: rgba(57, 255, 20, 0.18);
 }
 
 .calendar-event-more {
@@ -1546,6 +1655,18 @@ body.inputs-locked .bottom-bar-btn:disabled {
   font: 600 0.9rem/1.35 "Cascadia Mono", "Consolas", monospace;
 }
 
+.calendar-event-detail-until {
+  margin: 0;
+  color: var(--text-secondary);
+  font: 500 0.85rem/1.35 "Cascadia Mono", "Consolas", monospace;
+}
+
+.calendar-event-detail-email {
+  margin: 0;
+  color: var(--text-secondary);
+  font: 500 0.85rem/1.35 "Cascadia Mono", "Consolas", monospace;
+}
+
 .calendar-day-modal-panel--event .calendar-event-detail-date {
   font-size: 1.05rem;
 }
@@ -1554,12 +1675,18 @@ body.inputs-locked .bottom-bar-btn:disabled {
   font-size: 1rem;
 }
 
+.calendar-day-modal-panel--event .calendar-event-detail-until {
+  font-size: 0.92rem;
+}
+
+.calendar-day-modal-panel--event .calendar-event-detail-email {
+  font-size: 0.92rem;
+}
+
 .calendar-day-event {
   display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  gap: 8px;
   padding: 10px 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
@@ -1571,7 +1698,7 @@ body.inputs-locked .bottom-bar-btn:disabled {
   flex-direction: column;
   gap: 4px;
   min-width: 0;
-  flex: 1;
+  width: 100%;
 }
 
 .calendar-day-event-time {
@@ -1635,5 +1762,165 @@ body.inputs-locked .bottom-bar-btn:disabled {
   .calendar-grid-month,
   .calendar-day-column {
     min-height: 360px;
+  }
+}
+
+.meeting-recap-modals {
+  position: fixed;
+  top: max(34px, calc(env(safe-area-inset-top, 0) + 28px));
+  left: max(14px, calc(env(safe-area-inset-left, 0) + 10px));
+  right: auto;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(calc(100vw - 28px), 272px);
+  max-height: calc(100dvh - max(34px, calc(env(safe-area-inset-top, 0) + 28px)) - 72px);
+  padding: 0;
+  overflow-y: auto;
+  pointer-events: none;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(57, 255, 20, 0.22) transparent;
+}
+
+.meeting-recap-modals[hidden] {
+  display: none !important;
+}
+
+.meeting-recap-card {
+  pointer-events: auto;
+  flex-shrink: 0;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.meeting-recap-card.calendar-day-modal-panel--event {
+  width: 100%;
+  min-width: 0;
+  max-width: 272px;
+  padding: 10px 12px 12px;
+  border-radius: 10px;
+  gap: 0;
+}
+
+.meeting-recap-card .calendar-day-modal-layout {
+  gap: 10px;
+}
+
+.meeting-recap-card .calendar-day-modal-main {
+  gap: 8px;
+}
+
+.meeting-recap-card .calendar-day-modal-panel--event .calendar-day-modal-rail,
+.meeting-recap-card.calendar-day-modal-panel--event .calendar-day-modal-rail {
+  width: 32px;
+  gap: 8px;
+}
+
+.meeting-recap-card .calendar-day-modal-panel--event .calendar-day-title,
+.meeting-recap-card.calendar-day-modal-panel--event .calendar-day-title {
+  font-size: 0.82rem;
+  line-height: 1.25;
+}
+
+.meeting-recap-card .calendar-event-detail {
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.meeting-recap-card .calendar-day-modal-panel--event .calendar-event-detail-date,
+.meeting-recap-card .calendar-event-detail-date {
+  font-size: 0.72rem;
+}
+
+.meeting-recap-card .calendar-day-modal-panel--event .calendar-event-detail-time,
+.meeting-recap-card .calendar-event-detail-time {
+  font-size: 0.76rem;
+}
+
+.meeting-recap-card .calendar-day-modal-panel--event .calendar-event-detail-until,
+.meeting-recap-card .calendar-event-detail-until,
+.meeting-recap-card .calendar-day-modal-panel--event .calendar-event-detail-email,
+.meeting-recap-card .calendar-event-detail-email {
+  font-size: 0.7rem;
+}
+
+.meeting-recap-card .calendar-day-event-link--hero {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+}
+
+.meeting-recap-card .calendar-day-event-link--hero svg {
+  width: 20px;
+  height: 20px;
+}
+
+.meeting-recap-card:nth-child(1) {
+  z-index: 3;
+}
+
+.meeting-recap-card:nth-child(2) {
+  z-index: 2;
+}
+
+  .meeting-recap-card:nth-child(3) {
+  z-index: 1;
+}
+
+.meeting-reminder-control {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.meeting-reminder-label {
+  color: var(--text-muted);
+  font: 500 0.68rem/1.2 "Cascadia Mono", "Consolas", monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.meeting-reminder-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.meeting-reminder-toggle .meeting-reminder-btn,
+.meeting-reminder-toggle .voice-mode-btn {
+  min-width: 0;
+  padding: 4px 7px;
+  font-size: 0.68rem;
+}
+
+.meeting-reminder-status {
+  margin: 0;
+  color: var(--accent-soft);
+  font: 500 0.68rem/1.3 "Cascadia Mono", "Consolas", monospace;
+}
+
+.meeting-recap-card .meeting-reminder-control {
+  gap: 5px;
+}
+
+.meeting-recap-card .meeting-reminder-toggle .voice-mode-btn {
+  padding: 3px 6px;
+  font-size: 0.64rem;
+}
+
+@media (max-width: 700px) {
+  .meeting-recap-modals {
+    top: max(34px, calc(env(safe-area-inset-top, 0) + 28px));
+    left: max(12px, calc(env(safe-area-inset-left, 0) + 8px));
+    right: auto;
+    bottom: auto;
+    width: min(calc(100vw - 24px), 248px);
+    max-height: min(42dvh, 320px);
+  }
+
+  .meeting-recap-card.calendar-day-modal-panel--event {
+    max-width: 248px;
+    padding: 9px 10px 10px;
   }
 }

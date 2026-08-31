@@ -1,4 +1,11 @@
 function applyActivityEvent(event) {
+  if (
+    typeof handleMeetingReminderActivityEvent === "function" &&
+    handleMeetingReminderActivityEvent(event)
+  ) {
+    return;
+  }
+
   if (event.kind === "log" && event.source === "runtime.task_timer") {
     void syncRuntimeTaskTimer();
     return;

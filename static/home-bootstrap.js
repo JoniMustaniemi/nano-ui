@@ -114,6 +114,8 @@ async function initApp() {
   await loadNanoVersionFromBackend();
   void initVoiceVolumeControl();
   initVoiceModeControl();
+  initDebugControl();
+  void initMeetingReminders();
   restoreBaseAnswer();
   setVoiceStatus("Voice on standby.");
   syncVoiceListeningState();

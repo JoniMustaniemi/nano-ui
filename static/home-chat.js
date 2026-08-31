@@ -6,7 +6,9 @@ async function sendMessage() {
   }
   if (isViewSessionActive()) {
     if (tryHandleUiCommand(message, "text")) {
-      await completeUiCommand("text");
+      if (lastUiCommandResult) {
+        await completeUiCommand("text");
+      }
       messageBox.value = "";
       return;
     }
@@ -14,7 +16,9 @@ async function sendMessage() {
     return;
   }
   if (tryHandleUiCommand(message, "text")) {
-    await completeUiCommand("text");
+    if (lastUiCommandResult) {
+      await completeUiCommand("text");
+    }
     messageBox.value = "";
     return;
   }
@@ -318,7 +322,9 @@ async function submitMessage(message, source, commandHint, options = {}) {
   prepareSubmitMessageState(message, source, commandHint, context);
 
   if (tryHandleUiCommand(message, source)) {
-    await completeUiCommand(source);
+    if (lastUiCommandResult) {
+      await completeUiCommand(source);
+    }
     return;
   }
   if (isViewSessionActive() && source !== "command" && source !== "voice") {
@@ -353,6 +359,9 @@ async function submitMessage(message, source, commandHint, options = {}) {
   }
 
   if (requestFailed || !answerText) {
+    if (source === "voice") {
+      returnToWakeDetection();
+    }
     return;
   }
 
