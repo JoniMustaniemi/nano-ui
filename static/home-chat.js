@@ -174,8 +174,6 @@ function buildSubmitMessageContext(message, source, commandHint, options = {}) {
   const typedConfirmationAnswer =
     !confirmationAnswer &&
     (message === "yes" || message === "no") &&
-    inputActions &&
-    !inputActions.hidden &&
     (waitingForYesNoConfirmation || waitingForPresence);
   const isConfirmationAnswer = confirmationAnswer || typedConfirmationAnswer;
   const isPendingInputAnswer = isConfirmationAnswer || inputAnswer;
@@ -183,6 +181,10 @@ function buildSubmitMessageContext(message, source, commandHint, options = {}) {
     source === "voice" &&
     (waitingForFollowUp ||
       waitingForVoiceAnswer ||
+      waitingForYesNoConfirmation ||
+      currentAnswerPendingKind === "reboot_confirmation" ||
+      currentAnswerPendingKind === "service_restart_confirmation" ||
+      currentAnswerPendingKind === "wipe_confirmation" ||
       currentAnswerPendingKind === "timer_duration" ||
       currentInputKind === "timer_duration");
 
@@ -255,6 +257,12 @@ async function finalizeChatRequest(context) {
     return;
   }
   await syncRuntimeStatus();
+  if (rebootPendingFromStatus && !reconnectInProgress && typeof beginNanoReconnect === "function") {
+    void beginNanoReconnect("reboot_pi");
+  }
+  if (restartPendingFromStatus && !reconnectInProgress && typeof beginNanoReconnect === "function") {
+    void beginNanoReconnect("restart_nano");
+  }
   if (context.clearAllRequested) {
     await followUpClearAllTimersOnServer();
   }
@@ -270,10 +278,13 @@ async function handleChatSystemCommand(answerText, shouldSpeak) {
   }
   if (systemResponse.reconnect) {
     returnToWakeDetection();
-    if (shouldSpeak) {
-      await playVoice(answerText);
+    if (typeof clearAnswerOutput === "function") {
+      clearAnswerOutput();
     }
     void beginNanoReconnect(systemResponse.kind);
+    if (shouldSpeak) {
+      await playVoice(answerText, { skipAnswerUpdate: true });
+    }
     return true;
   }
   if (shouldSpeak) {
@@ -319,6 +330,7 @@ async function handleChatVoiceFollowUp(answerText, shouldSpeak, message) {
 
 async function submitMessage(message, source, commandHint, options = {}) {
   const context = buildSubmitMessageContext(message, source, commandHint, options);
+  const pendingReconnectKind = resolvePendingReconnectKind(message);
   prepareSubmitMessageState(message, source, commandHint, context);
 
   if (tryHandleUiCommand(message, source)) {
@@ -344,7 +356,9 @@ async function submitMessage(message, source, commandHint, options = {}) {
     const result = await sendChatRequest(message, source);
     answerText = result.answerText;
     shouldSpeak = result.shouldSpeak;
-    setAnswer(answerText, { deferClearUntilSpeech: shouldSpeak, allowDuringWorking: true });
+    if (!pendingReconnectKind) {
+      setAnswer(answerText, { deferClearUntilSpeech: shouldSpeak, allowDuringWorking: true });
+    }
     replyStatus.textContent = "";
     await refreshStorage();
   } catch (error) {
@@ -362,6 +376,15 @@ async function submitMessage(message, source, commandHint, options = {}) {
     if (source === "voice") {
       returnToWakeDetection();
     }
+    return;
+  }
+
+  if (pendingReconnectKind) {
+    returnToWakeDetection();
+    if (typeof clearAnswerOutput === "function") {
+      clearAnswerOutput();
+    }
+    void beginNanoReconnect(pendingReconnectKind);
     return;
   }
 

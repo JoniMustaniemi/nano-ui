@@ -189,6 +189,10 @@ function showConnectionOverlay(mode, options = {}) {
   applyConnectionOverlayMode(normalizedMode);
   overlay.hidden = false;
 
+  if (typeof clearAnswerOutput === "function") {
+    clearAnswerOutput();
+  }
+
   if (options.detailText) {
     stopConnectionOverlayMessages();
     setConnectionOverlayDetail(options.detailText);

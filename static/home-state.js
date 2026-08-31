@@ -96,6 +96,8 @@ let connectionOverlayMode = null;
 let connectionRecoveryStartedAt = 0;
 let rebootPendingFromStatus = false;
 let rebootBaselineBootId = null;
+let restartPendingFromStatus = false;
+let restartBaselineBootId = null;
 const LAST_BOOT_ID_KEY = "nano_boot_id";
 const LEGACY_BOOT_ID_KEY = "nano_last_boot_id";
 

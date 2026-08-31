@@ -343,6 +343,7 @@ def test_boot_state_sync() -> None:
     events_js = (STATIC_DIR / "home-events.js").read_text(encoding="utf-8")
     state_js = (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
     reconnect_js = (STATIC_DIR / "home-reconnect.js").read_text(encoding="utf-8")
+    chat_js = (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
     modules = json.loads((STATIC_DIR / "home-modules.json").read_text(encoding="utf-8"))
 
     assert "home-boot.js" in modules
@@ -352,16 +353,34 @@ def test_boot_state_sync() -> None:
     assert "LEGACY_BOOT_ID_KEY" in state_js
     assert "LAST_BOOT_ID_KEY" in state_js
     assert "pollStatusUntilBootIdChanges" in boot_js
+    assert "pollStatusUntilServiceRestart" in boot_js
+    assert "captureRestartBaseline" in boot_js
     assert "clearTransientUIState" in boot_js
     assert "realReboot" in boot_js
     assert "reboot_pending" in boot_js
+    assert "restart_pending" in boot_js
     assert "rebootPendingFromStatus" in state_js
+    assert "restartPendingFromStatus" in state_js
+    assert "restartBaselineBootId" in state_js
     assert "rebootBaselineBootId" in state_js
     assert "await syncBootState(snapshot)" in activity_js
     assert "options.bootKey" in greeting_js
     assert "rebootPendingFromStatus" in events_js
+    assert "restartPendingFromStatus" in events_js
     assert "beginNanoReconnect" in events_js
     assert "pollStatusUntilBootIdChanges" in reconnect_js
+    assert "pollStatusUntilServiceRestart" in reconnect_js
+    assert "captureRestartBaseline" in reconnect_js
+    assert "resolvePendingReconnectKind" in reconnect_js
+    assert "isSystemCommandGlitchResponse" in reconnect_js
+    assert "pendingReconnectKind" in chat_js
+    assert "clearAnswerOutput" in reconnect_js
+    assert "restartBaselineBootId" in reconnect_js
+    assert "boot.restart_pending === false" in boot_js
+    assert "sawHealthGap" not in boot_js
+    assert "restartPendingFromStatus" in chat_js
+    assert 'beginNanoReconnect("restart_nano")' in chat_js
+    assert 'connectionOverlayMode === "restarting"' in events_js
     assert "pickSystemCommandConfirmation" not in reconnect_js
 
 

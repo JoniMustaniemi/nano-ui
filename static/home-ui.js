@@ -1546,6 +1546,25 @@ function isConfusedReply(text) {
   );
 }
 
+function clearAnswerOutput() {
+  stopWorkingResponse({ restore: false });
+  clearAnswerClearTimer();
+  clearAnswerTimeoutTimer();
+  answerClearPending = false;
+  cancelAnswerReveal();
+  if (!answerOutput) {
+    return;
+  }
+  answerOutput.textContent = "";
+  answerOutput.classList.add("empty");
+  answerOutput.classList.remove("working", "rolling");
+  delete answerOutput.dataset.taskAck;
+  delete answerOutput.dataset.confused;
+  savedResponseBeforeWorking = null;
+  applyResponseTypography(IDLE_RESPONSE.length);
+  renderActivityStatus();
+}
+
 function setAnswer(text, options = {}) {
   const content = text.trim();
   const animate = options.animate !== false;

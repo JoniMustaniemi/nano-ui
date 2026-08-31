@@ -1,8 +1,8 @@
 const SYSTEM_COMMAND_IDS = new Set(["reboot_pi", "restart_nano"]);
 
 const RECONNECT_SUCCESS = {
-  reboot_pi: /rebooting the raspberry pi now/i,
-  restart_nano: /restarting nano now/i,
+  reboot_pi: /rebooting(?:\s+the)?\s+(?:raspberry\s+)?pi(?:\s+now)?/i,
+  restart_nano: /restarting(?:\s+(?:nano|the\s+service))?(?:\s+now)?/i,
 };
 const RECONNECT_CANCEL = {
   reboot_pi: /reboot cancelled/i,
@@ -14,7 +14,7 @@ const RECONNECT_DISABLED = {
 };
 const RECONNECT_TIMEOUT_MS = {
   reboot_pi: 180_000,
-  restart_nano: 30_000,
+  restart_nano: 120_000,
 };
 
 const REBOOT_MIN_RESTORE_MS = 20_000;
@@ -87,10 +87,44 @@ function setPendingSystemCommand(commandId) {
   }
 }
 
+function isAffirmativeConfirmation(message) {
+  const normalized = String(message || "").trim().toLowerCase();
+  return normalized === "yes" || normalized === "yeah" || normalized === "yep";
+}
+
+function resolvePendingReconnectKind(message) {
+  if (!isAffirmativeConfirmation(message)) {
+    return null;
+  }
+  if (pendingSystemCommandId === "reboot_pi" || currentAnswerPendingKind === "reboot_confirmation") {
+    return "reboot_pi";
+  }
+  if (
+    pendingSystemCommandId === "restart_nano" ||
+    currentAnswerPendingKind === "service_restart_confirmation"
+  ) {
+    return "restart_nano";
+  }
+  return null;
+}
+
+function isSystemCommandGlitchResponse(answerText) {
+  const lowered = String(answerText || "").toLowerCase();
+  return (
+    lowered.includes("wasn't restarted") ||
+    lowered.includes("was not restarted") ||
+    lowered.includes("create the branch") ||
+    (lowered.includes("i'm ready") && lowered.includes("branch"))
+  );
+}
+
 function enterConnectionRecoveryState() {
   reconnectInProgress = true;
   stateLine.textContent = "reconnecting";
   document.body.dataset.displayState = "reconnecting";
+  if (typeof clearAnswerOutput === "function") {
+    clearAnswerOutput();
+  }
   if (typeof updateEssenceState === "function") {
     updateEssenceState();
   }
@@ -126,6 +160,7 @@ async function recoverAfterReconnect() {
   connectionRecoveryStartedAt = 0;
   reconnectInProgress = false;
   rebootBaselineBootId = null;
+  restartBaselineBootId = null;
   clearPendingSystemCommand();
   stateLine.textContent = "standby";
   if (typeof renderState === "function") {
@@ -160,11 +195,16 @@ async function runConnectionRecovery({
 
   const baselineBootId =
     rebootBaselineBootId || readStoredBootId() || null;
-  if (
-    (overlayMode === "rebooting" || overlayMode === "restarting") &&
-    baselineBootId
-  ) {
+  if (overlayMode === "rebooting" && baselineBootId) {
     rebootBaselineBootId = baselineBootId;
+  }
+
+  const restartBaseline =
+    overlayMode === "restarting" && typeof captureRestartBaseline === "function"
+      ? await captureRestartBaseline()
+      : null;
+  if (overlayMode === "restarting" && restartBaseline?.bootId) {
+    restartBaselineBootId = restartBaseline.bootId;
   }
 
   connectionRecoveryStartedAt = Date.now();
@@ -179,24 +219,10 @@ async function runConnectionRecovery({
   }
 
   connectionRecoveryPromise = (async () => {
-    const recovered = await waitForNano({
-      timeoutMs,
-      intervalMs: CONNECTION_RECOVERY_POLL_MS,
-    });
-
-    if (!recovered) {
-      reconnectInProgress = false;
-      connectionRecoveryStartedAt = 0;
-      showConnectionRecoveryFailure("Could not reconnect. Check the Pi and refresh.");
-      return false;
-    }
-
-    if (
-      (overlayMode === "rebooting" || overlayMode === "restarting") &&
-      rebootBaselineBootId &&
-      typeof pollStatusUntilBootIdChanges === "function"
-    ) {
-      const snapshot = await pollStatusUntilBootIdChanges(rebootBaselineBootId, {
+    if (overlayMode === "restarting" && typeof pollStatusUntilServiceRestart === "function") {
+      const snapshot = await pollStatusUntilServiceRestart({
+        previousBootId: restartBaseline?.bootId || restartBaselineBootId,
+        previousBootedAt: restartBaseline?.bootedAt,
         timeoutMs,
         intervalMs: CONNECTION_RECOVERY_POLL_MS,
       });
@@ -205,6 +231,35 @@ async function runConnectionRecovery({
         connectionRecoveryStartedAt = 0;
         showConnectionRecoveryFailure("Could not reconnect. Check the Pi and refresh.");
         return false;
+      }
+    } else {
+      const recovered = await waitForNano({
+        timeoutMs,
+        intervalMs: CONNECTION_RECOVERY_POLL_MS,
+      });
+
+      if (!recovered) {
+        reconnectInProgress = false;
+        connectionRecoveryStartedAt = 0;
+        showConnectionRecoveryFailure("Could not reconnect. Check the Pi and refresh.");
+        return false;
+      }
+
+      if (
+        overlayMode === "rebooting" &&
+        rebootBaselineBootId &&
+        typeof pollStatusUntilBootIdChanges === "function"
+      ) {
+        const snapshot = await pollStatusUntilBootIdChanges(rebootBaselineBootId, {
+          timeoutMs,
+          intervalMs: CONNECTION_RECOVERY_POLL_MS,
+        });
+        if (!snapshot) {
+          reconnectInProgress = false;
+          connectionRecoveryStartedAt = 0;
+          showConnectionRecoveryFailure("Could not reconnect. Check the Pi and refresh.");
+          return false;
+        }
       }
     }
 
@@ -283,6 +338,15 @@ function handleSystemCommandResponse(answerText) {
   if (successKind) {
     clearPendingSystemCommand();
     return { handled: true, reconnect: true, kind: successKind };
+  }
+
+  if (
+    pendingSystemCommandId &&
+    isSystemCommandGlitchResponse(answerText)
+  ) {
+    const kind = pendingSystemCommandId;
+    clearPendingSystemCommand();
+    return { handled: true, reconnect: true, kind };
   }
 
   return { handled: false };

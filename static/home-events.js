@@ -245,6 +245,12 @@ function listen(lastEventId = 0) {
       }
       return;
     }
+    if (restartPendingFromStatus || connectionOverlayMode === "restarting") {
+      if (typeof beginNanoReconnect === "function") {
+        void beginNanoReconnect("restart_nano");
+      }
+      return;
+    }
     if (typeof beginConnectionRecovery === "function") {
       void beginConnectionRecovery();
       return;
