@@ -29,10 +29,14 @@ Nano UI runs in the browser. Nano Core runs on the Raspberry Pi. Together they h
 - Run **stopwatches** and stop them when done
 - Rename, cancel, or clear timers from the screen
 
-### Calendar and weather
+### Calendar
 
 - Connect a **Google Calendar** account on the Raspberry Pi and browse events in month, week, or day view
 - Switch between calendars from the screen
+- Set **meeting reminders** on upcoming events — 15 minutes, 30 minutes, or 1 hour before start
+
+### Weather
+
 - See **current weather** using your browser’s location
 
 ### Memory and files
