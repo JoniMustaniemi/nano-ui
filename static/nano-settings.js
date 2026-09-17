@@ -12,10 +12,28 @@ function refreshConnectionFields() {
   connectionKeyInput.value = getApiKey();
 }
 
+function normalizeConnectionInputUrl(url) {
+  if (typeof normalizeStoredApiUrl === "function") {
+    return normalizeStoredApiUrl(url);
+  }
+  const trimmed = (url || "").trim().replace(/\/$/, "");
+  if (!trimmed) {
+    return "";
+  }
+  if (typeof isSameOriginApiUrl === "function" && isSameOriginApiUrl(trimmed)) {
+    return "";
+  }
+  return trimmed;
+}
+
 function validateConnectionUrl(url) {
   const trimmed = (url || "").trim();
   if (!trimmed) {
     return null;
+  }
+
+  if (typeof isSameOriginApiUrl === "function" && isSameOriginApiUrl(trimmed)) {
+    return "Leave API URL blank when using this site. It connects through the hosted proxy.";
   }
 
   let parsed;
@@ -83,7 +101,8 @@ function initConnectionSettings() {
     connectionSettingsInitialized = true;
 
     connectionTestButton?.addEventListener("click", async () => {
-      const urlValidationError = validateConnectionUrl(connectionUrlInput.value);
+      const connectionUrl = normalizeConnectionInputUrl(connectionUrlInput.value);
+      const urlValidationError = validateConnectionUrl(connectionUrl);
       if (urlValidationError) {
         if (connectionStatus) {
           connectionStatus.textContent = urlValidationError;
@@ -91,7 +110,8 @@ function initConnectionSettings() {
         return;
       }
 
-      setApiConnection(connectionUrlInput.value, connectionKeyInput.value);
+      setApiConnection(connectionUrl, connectionKeyInput.value);
+      connectionUrlInput.value = connectionUrl;
       if (!hasApiConnection()) {
         if (connectionStatus) {
           connectionStatus.textContent = "API URL is required.";

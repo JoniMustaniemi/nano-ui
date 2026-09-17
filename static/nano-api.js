@@ -21,16 +21,59 @@ function getDefaultApiKey() {
   return "";
 }
 
+function isSameOriginApiUrl(url) {
+  const trimmed = (url || "").trim();
+  if (!trimmed) {
+    return false;
+  }
+  try {
+    return new URL(trimmed).origin === window.location.origin;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function normalizeStoredApiUrl(url) {
+  const trimmed = (url || "").trim().replace(/\/$/, "");
+  if (!trimmed || isSameOriginApiUrl(trimmed)) {
+    return "";
+  }
+  return trimmed;
+}
+
+function migrateStoredApiUrl() {
+  try {
+    const stored = window.localStorage.getItem(NANO_API_URL_KEY);
+    if (!stored) {
+      return;
+    }
+    const normalized = normalizeStoredApiUrl(stored);
+    const storedNormalized = stored.trim().replace(/\/$/, "");
+    if (normalized === storedNormalized) {
+      return;
+    }
+    if (normalized) {
+      window.localStorage.setItem(NANO_API_URL_KEY, normalized);
+    } else {
+      window.localStorage.removeItem(NANO_API_URL_KEY);
+    }
+  } catch (_error) {
+    // Ignore storage errors.
+  }
+}
+
+migrateStoredApiUrl();
+
 function getConfiguredApiUrl() {
   try {
     const stored = window.localStorage.getItem(NANO_API_URL_KEY);
     if (stored && stored.trim()) {
-      return stored.trim().replace(/\/$/, "");
+      return normalizeStoredApiUrl(stored);
     }
   } catch (_error) {
-    return getDefaultApiUrl();
+    return normalizeStoredApiUrl(getDefaultApiUrl());
   }
-  return getDefaultApiUrl();
+  return normalizeStoredApiUrl(getDefaultApiUrl());
 }
 
 function shouldUseDevApiProxy(configuredBase) {
@@ -75,8 +118,12 @@ function getApiKey() {
 }
 
 function setApiConnection(apiUrl, apiKey) {
-  const normalizedUrl = (apiUrl || "").trim().replace(/\/$/, "");
-  window.localStorage.setItem(NANO_API_URL_KEY, normalizedUrl);
+  const normalizedUrl = normalizeStoredApiUrl(apiUrl);
+  if (normalizedUrl) {
+    window.localStorage.setItem(NANO_API_URL_KEY, normalizedUrl);
+  } else {
+    window.localStorage.removeItem(NANO_API_URL_KEY);
+  }
   window.localStorage.setItem(NANO_API_KEY_KEY, (apiKey || "").trim());
 }
 
@@ -152,6 +199,8 @@ async function waitForNano({ timeoutMs = 120_000, intervalMs = 2_000 } = {}) {
 
 window.getApiBase = getApiBase;
 window.getConfiguredApiUrl = getConfiguredApiUrl;
+window.isSameOriginApiUrl = isSameOriginApiUrl;
+window.normalizeStoredApiUrl = normalizeStoredApiUrl;
 window.getApiKey = getApiKey;
 window.setApiConnection = setApiConnection;
 window.hasApiConnection = hasApiConnection;

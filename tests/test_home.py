@@ -292,6 +292,11 @@ def test_connection_settings_in_commands_panel() -> None:
     assert "getStoredUrlValidationError" in settings_js
     assert "handleConnectionAuthFailure" in settings_js
     assert "isWrongApiKeyError" in settings_js
+    assert "normalizeConnectionInputUrl" in settings_js
+    assert "Hosted UI:" in html_text
+    assert "isSameOriginApiUrl" in api_js
+    assert "normalizeStoredApiUrl" in api_js
+    assert "migrateStoredApiUrl" in api_js
 
 
 def test_connection_hardening() -> None:
