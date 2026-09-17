@@ -12,8 +12,42 @@ function refreshConnectionFields() {
   connectionKeyInput.value = getApiKey();
 }
 
+function validateConnectionUrl(url) {
+  const trimmed = (url || "").trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(trimmed);
+  } catch (_error) {
+    return "Enter a valid API URL, e.g. http://192.168.1.10:8080";
+  }
+
+  if (parsed.hostname === "localhost" && parsed.port === "8080") {
+    return "Do not use http://localhost:8080 from another PC — that is your PC, not the Pi.";
+  }
+
+  if (parsed.port === "8000") {
+    return "Port 8000 is hailo-ollama, not Nano. Use http://<PI-IP>:8080 instead.";
+  }
+
+  const effectivePort = parsed.port || (parsed.protocol === "https:" ? "443" : "80");
+  if (effectivePort !== "8080") {
+    return "Nano runs on port 8080. Check the API URL.";
+  }
+
+  return null;
+}
+
 async function checkApiHealth() {
   const response = await nanoFetch("/api/health");
+  if (response.status === 401) {
+    throw new Error(
+      "Wrong API key. Use the same value as API_KEY in /home/nano/nano-core/.env on the Pi.",
+    );
+  }
   if (!response.ok) {
     throw new Error(`Health check failed (${response.status}).`);
   }
@@ -29,6 +63,14 @@ function initConnectionSettings() {
     connectionSettingsInitialized = true;
 
     connectionTestButton?.addEventListener("click", async () => {
+      const urlValidationError = validateConnectionUrl(connectionUrlInput.value);
+      if (urlValidationError) {
+        if (connectionStatus) {
+          connectionStatus.textContent = urlValidationError;
+        }
+        return;
+      }
+
       setApiConnection(connectionUrlInput.value, connectionKeyInput.value);
       if (!hasApiConnection()) {
         if (connectionStatus) {

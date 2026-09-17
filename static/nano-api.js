@@ -102,6 +102,14 @@ async function nanoFetch(path, options = {}) {
     });
   } catch (error) {
     if (error instanceof TypeError) {
+      const configured = getConfiguredApiUrl();
+      if (configured) {
+        throw new Error(
+          "Could not reach the API. Test from your PC with curl http://<PI-IP>:8080/api/health. " +
+            "If the browser shows CORS, add this UI origin to CORS_ALLOWED_ORIGINS in /home/nano/nano-core/.env " +
+            "and run sudo systemctl restart nano-core.",
+        );
+      }
       throw new Error(
         "Could not reach the API. If you are developing locally, run npm run dev and open http://localhost:3000.",
       );

@@ -382,10 +382,31 @@ placeholder="No saved timers yet."
 <details id="connection-settings-dropdown" class="commands-dropdown commands-connection-dropdown">
 <summary class="commands-dropdown-toggle">Connection</summary>
 <section class="commands-settings-section commands-connection-settings" aria-label="Connection settings">
+<div class="connection-help">
+<p class="connection-help-title">nano-ui connection settings</p>
+<ul class="connection-help-list">
+<li><strong>API URL:</strong> <code>http://&lt;PI-IP&gt;:8080</code></li>
+<li><strong>API key:</strong> same value as <code>API_KEY</code> in <code>/home/nano/nano-core/.env</code></li>
+</ul>
+<p class="connection-help-subtitle">Do not use</p>
+<ul class="connection-help-list connection-help-warnings">
+<li><code>http://localhost:8080</code> from another PC — that is your PC, not the Pi</li>
+<li><code>http://&lt;PI-IP&gt;:8000</code> — that is hailo-ollama, not Nano</li>
+</ul>
+<p class="connection-help-subtitle">Get Pi IP on the Pi</p>
+<pre class="connection-help-code"><code>hostname -I</code></pre>
+<p class="connection-help-subtitle">Test from your PC before opening nano-ui</p>
+<pre class="connection-help-code"><code>curl http://&lt;PI-IP&gt;:8080/api/health</code></pre>
+<p class="connection-help-subtitle">If the page loads but chat/API fails</p>
+<ul class="connection-help-list">
+<li>F12 → Network → <strong>401</strong> = wrong API key</li>
+<li>F12 → Network → <strong>CORS</strong> = add UI origin to Pi <code>.env</code>:<br /><code>CORS_ALLOWED_ORIGINS=["http://localhost:3000"]</code><br />then: <code>sudo systemctl restart nano-core</code></li>
+</ul>
+</div>
 <label class="connection-label" for="nano-connection-url">API URL</label>
-<input id="nano-connection-url" class="connection-input" type="url" placeholder="Leave empty to use this site (default)" />
+<input id="nano-connection-url" class="connection-input" type="url" placeholder="http://&lt;PI-IP&gt;:8080 (or leave empty for this site)" />
 <label class="connection-label" for="nano-connection-key">API key</label>
-<input id="nano-connection-key" class="connection-input" type="password" placeholder="API key" autocomplete="off" />
+<input id="nano-connection-key" class="connection-input" type="password" placeholder="Same as API_KEY on the Pi" autocomplete="off" />
 <p id="nano-connection-status" class="nano-connection-status" aria-live="polite"></p>
 <div class="nano-connection-actions">
 <button id="nano-connection-test" type="button">Test connection</button>

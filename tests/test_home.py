@@ -269,7 +269,13 @@ def test_connection_settings_in_commands_panel() -> None:
     assert 'id="nano-connection-key"' in html_text
     assert 'id="connection-settings-dropdown"' in html_text
     assert "commands-connection-dropdown" in html_text
+    assert "nano-ui connection settings" in html_text
+    assert "http://&lt;PI-IP&gt;:8080" in html_text
+    assert "hailo-ollama" in html_text
+    assert "CORS_ALLOWED_ORIGINS" in html_text
     assert "initConnectionSettings" in settings_js
+    assert "validateConnectionUrl" in settings_js
+    assert "Wrong API key" in settings_js
     assert "openConnectionSettings" in settings_js
     assert "showConnectionOverlay" in settings_js
     assert "nano-connection-overlay" in overlay_js
@@ -657,6 +663,8 @@ def test_nano_api_dev_proxy() -> None:
     assert "shouldUseDevApiProxy" in api_js
     assert "resolveApiBase" in api_js
     assert "NANO_DEV_API_PROXY" in dev_server
+    assert ":8080" in dev_server
+    assert "CORS_ALLOWED_ORIGINS" in api_js
 
 
 def test_git_pr_ui_removed() -> None:

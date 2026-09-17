@@ -1,4 +1,4 @@
-const DEFAULT_API_ORIGIN = "http://86.60.218.175:8000";
+const DEFAULT_API_ORIGIN = "http://86.60.218.175:8080";
 
 function resolveApiOrigin(env) {
   const configured = (env.NANO_API_ORIGIN || DEFAULT_API_ORIGIN).trim();

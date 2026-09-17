@@ -65,6 +65,37 @@ With confirmation, you can ask Nano to:
 - **Restart** the Nano service on the Raspberry Pi
 - **Reboot** the Raspberry Pi
 
+## Connection settings
+
+When the UI is not using the hosted `/api` proxy, open **Commands → Connection** and point it at your Pi:
+
+| Field | Value |
+|-------|-------|
+| **API URL** | `http://<PI-IP>:8080` |
+| **API key** | Same value as `API_KEY` in `/home/nano/nano-core/.env` |
+
+Do **not** use:
+
+- `http://localhost:8080` from another PC — that is your PC, not the Pi
+- `http://<PI-IP>:8000` — that is hailo-ollama, not Nano
+
+Get the Pi IP on the Pi:
+
+```bash
+hostname -I
+```
+
+Test from your PC before opening nano-ui:
+
+```bash
+curl http://<PI-IP>:8080/api/health
+```
+
+If the page loads but chat/API fails:
+
+- F12 → Network → **401** = wrong API key
+- F12 → Network → **CORS** = add the UI origin to the Pi `.env`, for example `CORS_ALLOWED_ORIGINS=["http://localhost:3000"]`, then run `sudo systemctl restart nano-core`
+
 ## Hosting
 
 The site is hosted on [Cloudflare Pages](https://pages.cloudflare.com/). Static files are served from the repo root, and `/api/*` requests are proxied to the Raspberry Pi by a Pages Function.

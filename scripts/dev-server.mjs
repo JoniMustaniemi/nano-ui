@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const PORT = Number(process.env.PORT || 3000);
-const API_TARGET = (process.env.NANO_API_PROXY || "http://nano.local:8000").replace(/\/$/, "");
+const API_TARGET = (process.env.NANO_API_PROXY || "http://nano.local:8080").replace(/\/$/, "");
 const API_URL = new URL(API_TARGET);
 
 const MIME_TYPES = {
