@@ -1,7 +1,8 @@
-const DEFAULT_API_ORIGIN = "http://86.60.218.175:8080";
-
 function resolveApiOrigin(env) {
-  const configured = (env.NANO_API_ORIGIN || DEFAULT_API_ORIGIN).trim();
+  const configured = (env?.NANO_API_ORIGIN || "").trim();
+  if (!configured) {
+    throw new Error("NANO_API_ORIGIN environment variable is required");
+  }
   return configured.replace(/\/$/, "");
 }
 
@@ -37,7 +38,12 @@ function buildProxyHeaders(request, backendUrl) {
 
 export async function onRequest(context) {
   const incoming = new URL(context.request.url);
-  const apiOrigin = resolveApiOrigin(context.env);
+  let apiOrigin;
+  try {
+    apiOrigin = resolveApiOrigin(context.env);
+  } catch (error) {
+    return new Response(error.message, { status: 500 });
+  }
   const backend = resolveBackendUrl(apiOrigin, incoming);
   const method = context.request.method;
   const hasBody = method !== "GET" && method !== "HEAD";

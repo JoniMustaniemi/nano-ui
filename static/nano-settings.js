@@ -43,15 +43,35 @@ function validateConnectionUrl(url) {
 
 async function checkApiHealth() {
   const response = await nanoFetch("/api/health");
-  if (response.status === 401) {
-    throw new Error(
-      "Wrong API key. Use the same value as API_KEY in /home/nano/nano-core/.env on the Pi.",
-    );
+  if (isUnauthorizedResponse(response)) {
+    throw new Error(NANO_WRONG_API_KEY_MESSAGE);
   }
   if (!response.ok) {
     throw new Error(`Health check failed (${response.status}).`);
   }
   return response.json();
+}
+
+function getStoredUrlValidationError() {
+  const configured = getConfiguredApiUrl();
+  if (!configured) {
+    return null;
+  }
+  return validateConnectionUrl(configured);
+}
+
+function isWrongApiKeyError(error) {
+  return error?.message === NANO_WRONG_API_KEY_MESSAGE;
+}
+
+function handleConnectionAuthFailure(message) {
+  stopConnectionPoll();
+  if (typeof showConnectionOverlayFailure === "function") {
+    showConnectionOverlayFailure(message);
+  }
+  requestAnimationFrame(() => {
+    void openConnectionSettings();
+  });
 }
 
 function initConnectionSettings() {
@@ -163,7 +183,11 @@ function startConnectionPoll() {
           await checkApiHealth();
           await handleConnectionSuccess();
           return;
-        } catch (_error) {
+        } catch (error) {
+          if (isWrongApiKeyError(error)) {
+            handleConnectionAuthFailure(error.message);
+            return;
+          }
           // Keep polling until timeout or success.
         }
       }
@@ -191,11 +215,21 @@ async function openConnectionSettings() {
 }
 
 async function ensureApiConnection() {
+  const storedUrlError = getStoredUrlValidationError();
+  if (storedUrlError) {
+    handleConnectionAuthFailure(storedUrlError);
+    return false;
+  }
+
   if (hasApiConnection()) {
     try {
       await checkApiHealth();
       return true;
-    } catch (_error) {
+    } catch (error) {
+      if (isWrongApiKeyError(error)) {
+        handleConnectionAuthFailure(error.message);
+        return false;
+      }
       // Fall through to waiting overlay.
     }
   }

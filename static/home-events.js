@@ -236,6 +236,7 @@ function listen(lastEventId = 0) {
     appendEvent(payload);
   });
   source.onerror = () => {
+    closeActivityEventSource();
     if (reconnectInProgress) {
       return;
     }

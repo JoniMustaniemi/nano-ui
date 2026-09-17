@@ -46,6 +46,9 @@ async function syncRuntimeStatus() {
 }
 async function loadSnapshot() {
   const response = await nanoFetch("/api/status");
+  if (isUnauthorizedResponse(response)) {
+    throw new Error(NANO_WRONG_API_KEY_MESSAGE);
+  }
   if (!response.ok) {
     throw new Error("Could not load Nano status.");
   }

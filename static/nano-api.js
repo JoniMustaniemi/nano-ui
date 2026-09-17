@@ -1,5 +1,11 @@
 const NANO_API_URL_KEY = "nano.apiUrl";
 const NANO_API_KEY_KEY = "nano.apiKey";
+const NANO_WRONG_API_KEY_MESSAGE =
+  "Wrong API key. Use the same value as API_KEY in /home/nano/nano-core/.env on the Pi.";
+
+function isUnauthorizedResponse(response) {
+  return response.status === 401 || response.status === 403;
+}
 
 function getDefaultApiUrl() {
   if (typeof window.NANO_DEFAULT_API_URL === "string" && window.NANO_DEFAULT_API_URL.trim()) {
@@ -153,3 +159,5 @@ window.buildApiUrl = buildApiUrl;
 window.nanoFetch = nanoFetch;
 window.nanoEventSource = nanoEventSource;
 window.waitForNano = waitForNano;
+window.NANO_WRONG_API_KEY_MESSAGE = NANO_WRONG_API_KEY_MESSAGE;
+window.isUnauthorizedResponse = isUnauthorizedResponse;

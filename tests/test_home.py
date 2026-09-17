@@ -260,6 +260,7 @@ def test_bootstrap_waits_for_api_connection() -> None:
 
 def test_connection_settings_in_commands_panel() -> None:
     html_text = _load_index_html()
+    api_js = (STATIC_DIR / "nano-api.js").read_text(encoding="utf-8")
     settings_js = (STATIC_DIR / "nano-settings.js").read_text(encoding="utf-8")
     overlay_js = (STATIC_DIR / "nano-connection-overlay.js").read_text(encoding="utf-8")
     overlay_css = (STATIC_DIR / "nano-connection-overlay.css").read_text(encoding="utf-8")
@@ -275,7 +276,8 @@ def test_connection_settings_in_commands_panel() -> None:
     assert "CORS_ALLOWED_ORIGINS" in html_text
     assert "initConnectionSettings" in settings_js
     assert "validateConnectionUrl" in settings_js
-    assert "Wrong API key" in settings_js
+    assert "Wrong API key" in api_js
+    assert "NANO_WRONG_API_KEY_MESSAGE" in settings_js
     assert "openConnectionSettings" in settings_js
     assert "showConnectionOverlay" in settings_js
     assert "nano-connection-overlay" in overlay_js
@@ -287,6 +289,30 @@ def test_connection_settings_in_commands_panel() -> None:
     assert "WAITING_MESSAGES" not in settings_js
     assert "initConnectionSettings" in view_session_js
     assert "body.nano-connection-active .view-modal" in overlay_css
+    assert "getStoredUrlValidationError" in settings_js
+    assert "handleConnectionAuthFailure" in settings_js
+    assert "isWrongApiKeyError" in settings_js
+
+
+def test_connection_hardening() -> None:
+    api_js = (STATIC_DIR / "nano-api.js").read_text(encoding="utf-8")
+    settings_js = (STATIC_DIR / "nano-settings.js").read_text(encoding="utf-8")
+    activity_js = (STATIC_DIR / "home-activity.js").read_text(encoding="utf-8")
+    events_js = (STATIC_DIR / "home-events.js").read_text(encoding="utf-8")
+    proxy_js = (Path(__file__).resolve().parents[1] / "functions" / "api" / "[[path]].js").read_text(
+        encoding="utf-8"
+    )
+
+    assert "NANO_WRONG_API_KEY_MESSAGE" in api_js
+    assert "isUnauthorizedResponse" in api_js
+    assert "NANO_WRONG_API_KEY_MESSAGE" in settings_js
+    assert "isUnauthorizedResponse(response)" in settings_js
+    assert "getStoredUrlValidationError" in settings_js
+    assert "isUnauthorizedResponse(response)" in activity_js
+    assert "NANO_WRONG_API_KEY_MESSAGE" in activity_js
+    assert "closeActivityEventSource();" in events_js.split("source.onerror = () => {", 1)[1]
+    assert "86.60.218.175" not in proxy_js
+    assert "NANO_API_ORIGIN environment variable is required" in proxy_js
 
 
 def test_task_start_acknowledgment() -> None:
