@@ -1,3 +1,32 @@
+function shouldSkipRequestAck(message, source, commandHint, context = {}) {
+  if (context.isPendingInputAnswer) {
+    return true;
+  }
+  if (isBareTimerStartMessage(message)) {
+    return true;
+  }
+  if (extractTimerDurationSecondsFromMessage(message) > 0) {
+    return true;
+  }
+  if (context.isTimerDurationSubmit) {
+    return true;
+  }
+  if (commandHint && typeof isTimerToolCommand === "function" && isTimerToolCommand(commandHint)) {
+    return true;
+  }
+  if (commandHint && typeof isStopwatchToolCommand === "function" && isStopwatchToolCommand(commandHint)) {
+    return true;
+  }
+  if (isStopwatchStartMessage(message)) {
+    return true;
+  }
+  return false;
+}
+
+function shouldSkipTimerStartSpeech(context = {}) {
+  return Boolean(context.isTimerDurationSubmit);
+}
+
 async function sendMessage() {
   const message = messageBox.value.trim();
   if (!message) {
@@ -97,7 +126,7 @@ async function submitInputAnswer(answer) {
       return;
     }
     const durationSeconds = parseTimerDurationSeconds(raw);
-    await commitDurationSeconds(durationSeconds, { displayMessage: raw });
+    await commitDurationSeconds(durationSeconds, { displayMessage: raw, source: "text" });
     return;
   }
   if (requestInFlight) {

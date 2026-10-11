@@ -1,3 +1,14 @@
+const GENERIC_WORKING_PROGRESS_PATTERN =
+  /\b(?:finishing up|almost there|give me a moment|one moment|working on it|hang on|just a sec|please wait)\b/i;
+
+function isGenericWorkingProgressCopy(headline, detail) {
+  const combined = `${headline || ""} ${detail || ""}`.trim();
+  if (!combined) {
+    return true;
+  }
+  return GENERIC_WORKING_PROGRESS_PATTERN.test(combined);
+}
+
 function applyActivityEvent(event) {
   if (
     typeof handleMeetingReminderActivityEvent === "function" &&

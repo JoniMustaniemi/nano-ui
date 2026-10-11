@@ -1,4 +1,4 @@
-const homeModules = await fetch("./static/home-modules.json?v=module-entry-21").then((response) => {
+const homeModules = await fetch("./static/home-modules.json?v=module-entry-22").then((response) => {
   if (!response.ok) {
     throw new Error("Failed to load home module manifest.");
   }
@@ -26,5 +26,5 @@ for (const file of HOME_SCRIPT_ORDER) {
   ) {
     continue;
   }
-  await loadClassicScript(`./static/${file}?v=module-entry-21`);
+  await loadClassicScript(`./static/${file}?v=module-entry-22`);
 }

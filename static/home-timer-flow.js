@@ -200,18 +200,24 @@ function applyCreatedCountdownTimer(
   syncActiveTimers([...baseTimers, enriched]);
 }
 
-function beginDurationPrompt() {
+function beginDurationPrompt(source = "text") {
   localTimerDurationPromptActive = true;
   currentPendingSnapshot = null;
   currentAnswerPendingKind = "timer_duration";
   currentInputKind = "timer_duration";
   waitingForFollowUp = true;
   waitingForVoiceAnswer = false;
-  setAnswer(LOCAL_TIMER_DURATION_PROMPT, { animate: true });
   syncInputActions();
-  if (voiceAvailable && typeof ensureDirectAnswerListening === "function") {
-    ensureDirectAnswerListening(pendingListenStatus("timer_duration"));
-  }
+  notifyFastPathAction(LOCAL_TIMER_DURATION_PROMPT, source, {
+    onComplete: () => {
+      if (
+        localTimerDurationPromptActive &&
+        typeof ensureDirectAnswerListening === "function"
+      ) {
+        ensureDirectAnswerListening(pendingListenStatus("timer_duration"));
+      }
+    },
+  });
 }
 
 function beginLocalTimerDurationPrompt() {
@@ -245,6 +251,83 @@ function scheduleTimerStatusSync() {
   void syncRuntimeStatus().finally(() => {
     suppressPendingRearm = false;
   });
+}
+
+function formatDurationForSpeech(totalSeconds) {
+  const seconds = Math.max(1, Math.floor(Number(totalSeconds)));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  const parts = [];
+  if (hours > 0) {
+    parts.push(`${hours} hour${hours === 1 ? "" : "s"}`);
+  }
+  if (minutes > 0) {
+    parts.push(`${minutes} minute${minutes === 1 ? "" : "s"}`);
+  }
+  if (secs > 0 && hours === 0) {
+    parts.push(`${secs} second${secs === 1 ? "" : "s"}`);
+  }
+  return parts.length ? parts.join(" ") : "1 second";
+}
+
+function buildCountdownStartConfirmation(durationSeconds, label = "Timer") {
+  const durationText = formatDurationForSpeech(durationSeconds);
+  const name = String(label || "Timer").trim();
+  if (name && name !== "Timer") {
+    return `${name} timer set for ${durationText}.`;
+  }
+  return `Timer set for ${durationText}.`;
+}
+
+function buildStopwatchStartConfirmation(label = "Stopwatch") {
+  const name = String(label || "Stopwatch").trim();
+  if (name && name !== "Stopwatch") {
+    return `${name} stopwatch started.`;
+  }
+  return "Stopwatch started.";
+}
+
+function notifyFastPathAction(text, source = "text", options = {}) {
+  const content = String(text || "").trim();
+  if (!content) {
+    if (typeof options.onComplete === "function") {
+      options.onComplete();
+    }
+    return;
+  }
+  setAnswer(content, {
+    animate: true,
+    allowDuringWorking: true,
+    deferClearUntilSpeech: Boolean(voiceAvailable || source === "voice"),
+  });
+  const shouldSpeak = Boolean(voiceAvailable || source === "voice");
+  if (!shouldSpeak || typeof playVoice !== "function") {
+    if (typeof options.onComplete === "function") {
+      options.onComplete();
+    }
+    return;
+  }
+  const voiceOpts = {
+    allowDuringWorking: true,
+    skipAnswerUpdate: true,
+    forcePlayback: source === "voice",
+  };
+  const runSpeech = async () => {
+    if (source === "voice" && typeof resumeVoiceAudioContext === "function") {
+      await resumeVoiceAudioContext();
+    }
+    await playVoice(content, voiceOpts);
+  };
+  void runSpeech()
+    .catch(() => undefined)
+    .finally(() => {
+      if (typeof options.onComplete === "function") {
+        options.onComplete();
+      } else if (source === "voice" && typeof returnToWakeDetection === "function") {
+        returnToWakeDetection();
+      }
+    });
 }
 
 async function commitDurationSeconds(durationSeconds, options = {}) {
@@ -282,6 +365,7 @@ async function commitDurationSeconds(durationSeconds, options = {}) {
     label,
     committedAtMs,
   );
+  notifyFastPathAction(buildCountdownStartConfirmation(normalized, label), options.source);
 
   try {
     const created = await createCountdownTimer({
@@ -326,12 +410,12 @@ async function handleTimerUserMessage(message, source, options = {}, context = {
   }
   const durationSeconds = extractTimerDurationSecondsFromMessage(message);
   if (durationSeconds > 0) {
-    await commitDurationSeconds(durationSeconds, { displayMessage: message });
+    await commitDurationSeconds(durationSeconds, { displayMessage: message, source });
     return { handled: true };
   }
   if (!context.isPendingInputAnswer && isBareTimerStartMessage(message)) {
     showUserSpeech(message);
-    beginDurationPrompt();
+    beginDurationPrompt(source);
     return { handled: true };
   }
   return { handled: false };
@@ -346,12 +430,15 @@ async function handleTimerToolCommand(command, message) {
   }
   if (isBareTimerStartMessage(message)) {
     showUserSpeech(message);
-    beginDurationPrompt();
+    beginDurationPrompt("command");
     return { handled: true };
   }
   const timerDurationSeconds = extractTimerDurationSecondsFromMessage(message);
   if (timerDurationSeconds > 0) {
-    const ok = await commitDurationSeconds(timerDurationSeconds, { displayMessage: message });
+    const ok = await commitDurationSeconds(timerDurationSeconds, {
+      displayMessage: message,
+      source: "command",
+    });
     return { handled: ok };
   }
   return { handled: false };
@@ -407,6 +494,9 @@ function registerCommittedStopwatch(serverTimer, committedAtMs, label = "Stopwat
   stopwatch.serverBacked = true;
   stopwatch.serverSource = serverTimer;
   stopwatch.storageKey = computeStopwatchStorageKey(stopwatch, serverTimer);
+  if (typeof clearStopwatchStoppedMarkers === "function") {
+    clearStopwatchStoppedMarkers(stopwatch);
+  }
   clearOptimisticLocalStopwatches();
   pruneOptimisticStopwatchesForServerTimer({
     ...serverTimer,
@@ -424,6 +514,9 @@ function showOptimisticStopwatch(committedAtMs, label = "Stopwatch") {
   clearOptimisticLocalStopwatches();
   const stopwatch = createLocalStopwatch({ label, startedAtMs: committedAtMs });
   stopwatch.client_started_at_ms = committedAtMs;
+  if (typeof clearStopwatchStoppedMarkers === "function") {
+    clearStopwatchStoppedMarkers(stopwatch);
+  }
   localStopwatches.set(getTimerAnnouncementKey(stopwatch), stopwatch);
   if (typeof refreshTimerDisplays === "function") {
     refreshTimerDisplays();
@@ -449,6 +542,7 @@ async function commitStopwatchStart(options = {}) {
   replyStatus.textContent = "Starting stopwatch...";
   syncInputActions();
   showOptimisticStopwatch(committedAtMs, label);
+  notifyFastPathAction(buildStopwatchStartConfirmation(label), options.source);
 
   try {
     const created = await createStopwatch({ label, startAt: options.startAt ?? committedAtMs });
@@ -476,7 +570,7 @@ async function handleStopwatchUserMessage(message, source, options = {}, context
     return { handled: false };
   }
   if (!context.isPendingInputAnswer && isStopwatchStartMessage(message)) {
-    await commitStopwatchStart({ displayMessage: message });
+    await commitStopwatchStart({ displayMessage: message, source });
     return { handled: true };
   }
   return { handled: false };
@@ -491,6 +585,6 @@ async function handleStopwatchToolCommand(command, message) {
   }
   const startMessage =
     isStopwatchStartMessage(message) ? message : String(message || "").trim() || "start stopwatch";
-  await commitStopwatchStart({ displayMessage: startMessage });
+  await commitStopwatchStart({ displayMessage: startMessage, source: "command" });
   return { handled: true };
 }

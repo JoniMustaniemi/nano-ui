@@ -63,9 +63,6 @@ function getStopwatchStoppedKeys(timer) {
   return keys;
 }
 
-function getStopwatchStateKeys(timer) {
-  return getStopwatchStoppedKeys(timer);
-}
 
 function isStopwatchStartMessage(message) {
   const base =
@@ -155,6 +152,24 @@ function startLocalStopwatch({ label = "Stopwatch", startedAtMs = Date.now() } =
   localStopwatches.set(getTimerAnnouncementKey(stopwatch), stopwatch);
   refreshTimerDisplays();
   return stopwatch;
+}
+
+function clearStopwatchStoppedMarkers(timer) {
+  if (!timer) {
+    return;
+  }
+  const id = String(timer?.id || timer?.serverSource?.id || "").trim();
+  if (id) {
+    stoppedStopwatchIds.delete(id);
+  }
+  for (const key of getStopwatchStoppedKeys(timer)) {
+    stoppedStopwatchKeys.delete(key);
+  }
+  if (timer.serverSource) {
+    for (const key of getStopwatchStoppedKeys(timer.serverSource)) {
+      stoppedStopwatchKeys.delete(key);
+    }
+  }
 }
 
 function markStopwatchStopped(timer) {
@@ -311,24 +326,6 @@ function isStopwatchIdActive(stopwatchId) {
   );
 }
 
-async function waitForServerTimerRemoved(timerId) {
-  const normalizedId = timerId != null ? String(timerId).trim() : "";
-  if (!normalizedId) {
-    return false;
-  }
-  for (let attempt = 0; attempt < TIMER_SERVER_SYNC_MAX_ATTEMPTS; attempt += 1) {
-    if (attempt > 0) {
-      await new Promise((resolve) => {
-        window.setTimeout(resolve, TIMER_SERVER_SYNC_POLL_MS);
-      });
-    }
-    await syncRuntimeStatus();
-    if (!isCountdownTimerIdActive(normalizedId)) {
-      return true;
-    }
-  }
-  return false;
-}
 
 function updateLocalStopwatchLabel(timerKey, newLabel) {
   const storageKey = resolveStopwatchStorageKey({ storageKey: timerKey, id: timerKey });
@@ -377,37 +374,6 @@ function findStopwatchByKey(timerKey) {
     }
   }
   return getDisplayStopwatches().find((stopwatch) => getTimerAnnouncementKey(stopwatch) === timerKey) || null;
-}
-
-function bindActiveTimerActions() {
-  if (!activeTimersRoot || activeTimersRoot.dataset.actionsBound === "true") {
-    return;
-  }
-  activeTimersRoot.dataset.actionsBound = "true";
-  activeTimersRoot.addEventListener("click", (event) => {
-    const button = event.target.closest(".active-timer-action");
-    if (!button || button.disabled) {
-      return;
-    }
-    const item = button.closest("[data-timer-key]");
-    if (!item) {
-      return;
-    }
-    const timer = findCountdownTimerForAction(item);
-    if (!timer) {
-      return;
-    }
-    const action = button.textContent.trim();
-    if (action === "Cancel") {
-      if (typeof cancelActiveTimer === "function") {
-        void cancelActiveTimer(timer);
-      }
-      return;
-    }
-    if (action === "OK") {
-      okExpiredTimer(timer);
-    }
-  });
 }
 
 function bindActiveStopwatchActions() {

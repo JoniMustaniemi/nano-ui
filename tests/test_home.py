@@ -27,6 +27,30 @@ def _load_index_html() -> str:
     return INDEX_PATH.read_text(encoding="utf-8")
 
 
+def _load_voice_js() -> str:
+    parts = (
+        "home-voice-controls.js",
+        "home-voice-recognition.js",
+        "home-voice-playback.js",
+    )
+    return "\n".join((STATIC_DIR / part).read_text(encoding="utf-8") for part in parts)
+
+
+def _load_calendar_js() -> str:
+    return (
+        (STATIC_DIR / "home-calendar-core.js").read_text(encoding="utf-8")
+        + (STATIC_DIR / "home-calendar-ui.js").read_text(encoding="utf-8")
+    )
+
+
+def _load_tool_commands_js() -> str:
+    return (STATIC_DIR / "home-tool-commands.js").read_text(encoding="utf-8")
+
+
+def _load_ui_commands_js() -> str:
+    return (STATIC_DIR / "home-ui-commands.js").read_text(encoding="utf-8")
+
+
 def test_home_modules_manifest_matches_entry_loader() -> None:
     entry_js = (STATIC_DIR / "home-entry.js").read_text(encoding="utf-8")
     manifest_modules = list(HOME_JS_MODULES)
@@ -156,7 +180,7 @@ def test_ui_does_not_run_legacy_wake_loop() -> None:
 
 
 def test_browser_voice_sends_text_to_pi() -> None:
-    voice_js = (STATIC_DIR / "home-voice.js").read_text(encoding="utf-8")
+    voice_js = _load_voice_js()
     activity_js = (STATIC_DIR / "home-activity.js").read_text(encoding="utf-8")
     chat_js = (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
     state_js = (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
@@ -235,7 +259,7 @@ def test_browser_voice_sends_text_to_pi() -> None:
 
 
 def test_voice_volume_loads_from_server() -> None:
-    voice_js = (STATIC_DIR / "home-voice.js").read_text(encoding="utf-8")
+    voice_js = _load_voice_js()
 
     assert "loadVoiceVolumeFromServer" in voice_js
     assert 'method: "PUT"' in voice_js.split("syncVoiceVolumeToServer", 1)[1].split("function setVoiceVolumeFromInput", 1)[0]
@@ -253,7 +277,7 @@ def test_bootstrap_waits_for_api_connection() -> None:
     assert "ensureApiConnection" in bootstrap_js
     assert "completeStartupAfterConnection" in bootstrap_js
     assert "submitInputAnswer" in (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
-    assert "syncInputActions" in (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+    assert "syncInputActions" in _load_tool_commands_js()
     assert "loadNanoVersionFromBackend" in bootstrap_js
     assert 'nanoFetch("/api/health")' in bootstrap_js
 
@@ -298,8 +322,8 @@ def test_connection_settings_in_commands_panel() -> None:
     assert "handleConnectionAuthFailure" in settings_js
     assert "isWrongApiKeyError" in settings_js
     assert "normalizeConnectionInputUrl" in settings_js
-    assert "initCommandsRail" in (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
-    assert "setCommandsSection" in (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+    assert "initCommandsRail" in _load_tool_commands_js()
+    assert "setCommandsSection" in _load_tool_commands_js()
     assert 'id="view-modal-back"' in html_text
     assert "goBackViewSession" in view_session_js
     assert "viewReturnStack" in view_session_js
@@ -332,7 +356,7 @@ def test_connection_hardening() -> None:
 def test_task_start_acknowledgment() -> None:
     state_js = (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
     chat_js = (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
-    voice_js = (STATIC_DIR / "home-voice.js").read_text(encoding="utf-8")
+    voice_js = _load_voice_js()
     ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
 
     assert "TASK_ACK_POOL" in state_js
@@ -365,7 +389,7 @@ def test_reboot_restart_reconnect_helpers() -> None:
     activity_js = _load_home_js()
     reconnect_js = (STATIC_DIR / "home-reconnect.js").read_text(encoding="utf-8")
     api_js = (STATIC_DIR / "nano-api.js").read_text(encoding="utf-8")
-    voice_js = (STATIC_DIR / "home-voice.js").read_text(encoding="utf-8")
+    voice_js = _load_voice_js()
     chat_js = (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
     entry_js = (STATIC_DIR / "home-entry.js").read_text(encoding="utf-8")
 
@@ -442,16 +466,16 @@ def test_boot_state_sync() -> None:
 
 
 def test_pending_confirmation_kinds() -> None:
-    ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+    tool_commands_js = _load_tool_commands_js()
     greeting_js = (STATIC_DIR / "home-greeting.js").read_text(encoding="utf-8")
-    voice_js = (STATIC_DIR / "home-voice.js").read_text(encoding="utf-8")
+    voice_js = _load_voice_js()
 
-    assert "reboot_confirmation" in ui_js
-    assert "service_restart_confirmation" in ui_js
-    assert "VOICE_YES_NO_PENDING_KINDS" in ui_js
-    assert "BUTTON_YES_NO_PENDING_KINDS" in ui_js
-    assert "reboot_confirmation" not in ui_js.split("BUTTON_YES_NO_PENDING_KINDS = new Set([", 1)[1].split("]);", 1)[0]
-    assert "service_restart_confirmation" not in ui_js.split("BUTTON_YES_NO_PENDING_KINDS = new Set([", 1)[1].split("]);", 1)[0]
+    assert "reboot_confirmation" in tool_commands_js
+    assert "service_restart_confirmation" in tool_commands_js
+    assert "VOICE_YES_NO_PENDING_KINDS" in tool_commands_js
+    assert "BUTTON_YES_NO_PENDING_KINDS" in tool_commands_js
+    assert "reboot_confirmation" not in tool_commands_js.split("BUTTON_YES_NO_PENDING_KINDS = new Set([", 1)[1].split("]);", 1)[0]
+    assert "service_restart_confirmation" not in tool_commands_js.split("BUTTON_YES_NO_PENDING_KINDS = new Set([", 1)[1].split("]);", 1)[0]
     assert "PENDING_SYSTEM_COMMAND_KINDS" in greeting_js
     assert 'reboot_confirmation: "reboot_pi"' in greeting_js
     assert 'service_restart_confirmation: "restart_nano"' in greeting_js
@@ -484,7 +508,7 @@ def test_improvement_plans_removed() -> None:
 
 def test_confirmation_answer_clears_waiting_state() -> None:
     chat_js = (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
-    voice_js = (STATIC_DIR / "home-voice.js").read_text(encoding="utf-8")
+    voice_js = _load_voice_js()
     greeting_js = (STATIC_DIR / "home-greeting.js").read_text(encoding="utf-8")
 
     assert 'confirmationAnswer: true' in chat_js
@@ -498,7 +522,7 @@ def test_confirmation_answer_clears_waiting_state() -> None:
 
 
 def test_pending_input_actions() -> None:
-    ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+    ui_js = _load_tool_commands_js()
     bootstrap_js = (STATIC_DIR / "home-bootstrap.js").read_text(encoding="utf-8")
     html_text = _load_index_html()
 
@@ -538,9 +562,10 @@ def test_voice_pending_answer_clears_waiting_state() -> None:
 
 
 def test_timer_tool_command_helpers() -> None:
-    ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+    ui_js = _load_tool_commands_js()
+    ui_commands_js = _load_ui_commands_js()
     chat_js = (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
-    voice_js = (STATIC_DIR / "home-voice.js").read_text(encoding="utf-8")
+    voice_js = _load_voice_js()
     api_js = (STATIC_DIR / "home-timer-api.js").read_text(encoding="utf-8")
     flow_js = (STATIC_DIR / "home-timer-flow.js").read_text(encoding="utf-8")
     manifest_modules = list(HOME_JS_MODULES)
@@ -551,7 +576,7 @@ def test_timer_tool_command_helpers() -> None:
     assert "resolveToolCommandMessage" in ui_js
     assert "isTimerToolCommand" in ui_js
     assert 'return "Start a timer"' in ui_js
-    assert "handleTimerToolCommand" in ui_js
+    assert "handleTimerToolCommand" in flow_js
     assert "EXCLUDED_TOOL_COMMAND_IDS" in ui_js
     assert 'source !== "command"' in chat_js
     assert "commitDurationSeconds" in chat_js
@@ -575,7 +600,7 @@ def test_timer_tool_command_helpers() -> None:
     assert "handleStopwatchUserMessage" in submit_fast_path
     assert "beginLocalTimerDurationPrompt" not in submit_fast_path
     assert "isStopwatchToolCommand" in ui_js
-    assert "handleStopwatchToolCommand" in ui_js
+    assert "handleStopwatchToolCommand" in flow_js
     assert "createStopwatch" in api_js
     assert '"/api/stopwatches"' in api_js
     assert "commitStopwatchStart" in flow_js
@@ -588,26 +613,33 @@ def test_timer_tool_command_helpers() -> None:
     assert "requestInFlight" not in commit_stopwatch_fn
     assert "submitMessage" not in commit_stopwatch_fn
     assert "stopwatchCreateInFlight" in voice_js
-    timers_js = (STATIC_DIR / "home-timers.js").read_text(encoding="utf-8")
-    assert "isPlausibleStopwatchStartMs" in timers_js
-    assert "resolveTimerStartedAtMs" in timers_js
+    shared_js = (STATIC_DIR / "home-timer-shared.js").read_text(encoding="utf-8")
+    assert "isPlausibleStopwatchStartMs" in shared_js
+    assert "resolveTimerStartedAtMs" in shared_js
+    stopwatches_js = (STATIC_DIR / "home-stopwatches.js").read_text(encoding="utf-8")
+    is_stopped_fn = stopwatches_js.split("function isStopwatchStopped", 1)[1].split("function stopLocalStopwatch", 1)[0]
+    assert "stoppedStopwatchIds.has(id)" in is_stopped_fn
+    assert "clearStopwatchStoppedMarkers" in stopwatches_js
     commit_fn = flow_js.split("async function commitDurationSeconds", 1)[1].split(
         "async function startCountdownFromDuration", 1
     )[0]
     assert "requestInFlight" not in commit_fn
     assert "submitMessage" not in commit_fn
+    assert "notifyFastPathAction" in flow_js
+    assert "buildCountdownStartConfirmation" in flow_js
+    assert "buildStopwatchStartConfirmation" in flow_js
     assert "scheduleTimerStatusSync" in flow_js
     assert "void syncRuntimeStatus" in flow_js
     assert "countdownCreateInFlight" in voice_js
     assert "shouldSkipRequestAck" in chat_js
     assert "answerNeedsTimerDuration" in voice_js
-    assert "restoreWake: false" in ui_js
+    assert "restoreWake: false" in ui_commands_js
 
 
 def test_clear_all_timers() -> None:
     activity_js = _load_home_js()
     chat_js = (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
-    ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+    ui_js = _load_tool_commands_js()
 
     assert "isClearAllTimersMessage" in activity_js
     assert "isClearAllTimersCommand" in activity_js
@@ -645,9 +677,10 @@ def test_active_timer_ui() -> None:
     )[0]
     assert remaining_fn.index("timer.due_at") < remaining_fn.index("remaining_seconds")
     assert "parseTimerDurationSeconds" in activity_js
-    assert "armPendingCountdownAnchor" in activity_js
+    assert "applyCreatedCountdownTimer" in activity_js
     assert "mergeCountdownTimersFromServer" in activity_js
-    assert "isGenericWorkingProgressCopy" in activity_js
+    events_js = (STATIC_DIR / "home-events.js").read_text(encoding="utf-8")
+    assert "isGenericWorkingProgressCopy" in events_js
     assert "has-active-timers" in activity_js
     assert "position: absolute" not in css_text.split(".active-timers {", 1)[1].split("}", 1)[0]
     assert "cancelActiveTimer" in chat_js
@@ -779,7 +812,7 @@ def test_nano_api_dev_proxy() -> None:
 
 
 def test_git_pr_ui_removed() -> None:
-    ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+    ui_js = _load_tool_commands_js()
 
     assert 'LAST_COMMAND_CATEGORIES = ["System"]' in ui_js
     assert '"Git"' not in ui_js
@@ -793,7 +826,7 @@ def test_git_pr_ui_removed() -> None:
 
 
 def test_weather_command_ui_removed() -> None:
-    ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+    ui_js = _load_tool_commands_js()
 
     assert "WEATHER_COMMAND_PATTERN" in ui_js
     assert '"get_current_weather"' in ui_js
@@ -803,7 +836,8 @@ def test_weather_command_ui_removed() -> None:
 
 
 def test_hidden_tool_commands_ui_removed() -> None:
-    ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+    ui_js = _load_tool_commands_js()
+    ui_commands_js = _load_ui_commands_js()
 
     assert "EXCLUDED_TOOL_COMMAND_IDS" in ui_js
     assert "HIDDEN_TOOL_COMMAND_PATTERN" in ui_js
@@ -831,7 +865,7 @@ def test_hidden_tool_commands_ui_removed() -> None:
     assert '"What can you do?"' not in ui_js
     assert '"Hide/show controls"' not in ui_js
     assert '"Internal notes"' not in ui_js
-    assert "internal notes" not in ui_js.split("BRAINS_SECTION_PATTERNS")[1].split("STORAGE_SECTION_PATTERNS")[0]
+    assert "internal notes" not in ui_commands_js.split("BRAINS_SECTION_PATTERNS")[1].split("STORAGE_SECTION_PATTERNS")[0]
 
 
 def test_saved_timers_panel_uses_runtime_state() -> None:
@@ -849,7 +883,7 @@ def test_saved_timers_panel_uses_runtime_state() -> None:
 
 def test_voice_mode_is_ui_toggle_only() -> None:
     ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
-    voice_js = (STATIC_DIR / "home-voice.js").read_text(encoding="utf-8")
+    voice_js = _load_voice_js()
     state_js = (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
     html_text = _load_index_html()
     activity_js = _load_home_js()
@@ -890,36 +924,39 @@ def test_debug_panel_integration() -> None:
     assert "initDebugControl" in bootstrap_js
     assert ".nano-debug-panel" in css_text
     assert "updateDebugVoiceRecognition" in debug_js
-    ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
-    assert "DEBUG_MODE_ON_PATTERNS" in ui_js
-    assert "DEBUG_MODE_OFF_PATTERNS" in ui_js
-    assert '"debug_mode"' in ui_js
-    assert "setDebugModeEnabled" in ui_js
-    assert "debug_mode_on" in ui_js
-    assert "debug_mode_off" in ui_js
+    ui_commands_js = _load_ui_commands_js()
+    tool_commands_js = _load_tool_commands_js()
+    assert "DEBUG_MODE_ON_PATTERNS" in ui_commands_js
+    assert "DEBUG_MODE_OFF_PATTERNS" in ui_commands_js
+    assert '"debug_mode"' in ui_commands_js
+    assert "setDebugModeEnabled" in ui_commands_js
+    assert "debug_mode_on" in tool_commands_js
+    assert "debug_mode_off" in tool_commands_js
 
 
 def test_calendar_recap_integration() -> None:
     html_text = _load_index_html()
     modules = json.loads((STATIC_DIR / "home-modules.json").read_text(encoding="utf-8"))
     recap_js = (STATIC_DIR / "home-calendar-recap.js").read_text(encoding="utf-8")
-    calendar_js = (STATIC_DIR / "home-calendar.js").read_text(encoding="utf-8")
-    ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+    calendar_js = _load_calendar_js()
+    ui_commands_js = _load_ui_commands_js()
+    tool_commands_js = _load_tool_commands_js()
     dom_js = (STATIC_DIR / "home-dom.js").read_text(encoding="utf-8")
     css_text = _load_home_css()
 
     assert "home-calendar-recap.js" in modules
-    calendar_index = modules.index("home-calendar.js")
+    calendar_core_index = modules.index("home-calendar-core.js")
+    assert modules.index("home-calendar-ui.js") == calendar_core_index + 1
     reminders_index = modules.index("home-meeting-reminders.js")
     recap_index = modules.index("home-calendar-recap.js")
-    assert reminders_index == calendar_index + 1
+    assert reminders_index == calendar_core_index + 2
     assert recap_index == reminders_index + 1
     assert 'id="meeting-recap-modals"' in html_text
     assert "meetingRecapModals" in dom_js
-    assert "CALENDAR_RECAP_PATTERNS" in ui_js
-    assert "CALENDAR_RECAP_LOOKING_PATTERNS" in ui_js
-    assert "hasCalendarRecapIntent" in ui_js
-    assert "calendar_recap" in ui_js
+    assert "CALENDAR_RECAP_PATTERNS" in ui_commands_js
+    assert "CALENDAR_RECAP_LOOKING_PATTERNS" in ui_commands_js
+    assert "hasCalendarRecapIntent" in ui_commands_js
+    assert "calendar_recap" in ui_commands_js
     assert "handleCalendarRecap" in recap_js
     assert "formatSpeechClockTime" in calendar_js
     assert "formatSpeechDayPeriod" in calendar_js
@@ -946,7 +983,7 @@ def test_calendar_recap_integration() -> None:
     assert "calendar-event-detail-email" in recap_js
     assert "eventSpeechTitle" not in recap_js
     assert "calendar-event-detail-until" in css_text
-    assert "calendar_recap_today" in ui_js
+    assert "calendar_recap_today" in tool_commands_js
     assert ".meeting-recap-modals" in css_text
 
 
@@ -955,7 +992,7 @@ def test_meeting_reminders_integration() -> None:
     reminders_js = (STATIC_DIR / "home-meeting-reminders.js").read_text(encoding="utf-8")
     state_js = (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
     bootstrap_js = (STATIC_DIR / "home-bootstrap.js").read_text(encoding="utf-8")
-    calendar_js = (STATIC_DIR / "home-calendar.js").read_text(encoding="utf-8")
+    calendar_js = _load_calendar_js()
     recap_js = (STATIC_DIR / "home-calendar-recap.js").read_text(encoding="utf-8")
     css_text = _load_home_css()
     api_doc = (ROOT_DIR / "docs" / "meeting-reminders-api.md").read_text(encoding="utf-8")
@@ -988,8 +1025,9 @@ def test_meeting_reminders_integration() -> None:
 
 def test_voice_mode_toggle_integration() -> None:
     html_text = _load_index_html()
-    voice_js = (STATIC_DIR / "home-voice.js").read_text(encoding="utf-8")
-    ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+    voice_js = _load_voice_js()
+    tool_commands_js = _load_tool_commands_js()
+    shell_ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
     dom_js = (STATIC_DIR / "home-dom.js").read_text(encoding="utf-8")
     state_js = (STATIC_DIR / "home-state.js").read_text(encoding="utf-8")
     bootstrap_js = (STATIC_DIR / "home-bootstrap.js").read_text(encoding="utf-8")
@@ -1004,10 +1042,10 @@ def test_voice_mode_toggle_integration() -> None:
     assert "initVoiceModeControl" in voice_js
     assert "connectBrowserMicrophoneIfEnabled" in voice_js
     assert "initVoiceModeControl" in bootstrap_js
-    assert '"voice_mode"' in ui_js
+    assert '"voice_mode"' in shell_ui_js
     assert 'id="voice-push-toggle"' not in html_text
     assert ".commands-switch" in css_text
-    assert "commandActionDescription" in ui_js
+    assert "commandActionDescription" in tool_commands_js
     set_voice_mode_fn = voice_js.split("async function setVoiceModeEnabled", 1)[1].split(
         "function initVoiceModeControl",
         1,

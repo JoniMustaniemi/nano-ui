@@ -106,9 +106,6 @@ function setViewModalExpanded(expanded) {
 }
 
 function prepareViewSwitch(fromView) {
-  if (fromView === "commands") {
-    closeCommandDropdowns();
-  }
   if (fromView === "calendar") {
     if (typeof closeCalendarDayPanel === "function") {
       closeCalendarDayPanel();
