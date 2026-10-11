@@ -3,6 +3,7 @@ const VIEW_TITLES = {
   storage: "Saved timers",
   commands: "Commands",
   calendar: "Calendar",
+  drive: "Google Drive",
 };
 
 const VIEW_SUBTITLES = {
@@ -14,6 +15,7 @@ const VIEW_OPEN_ACK = {
   storage: "Opening saved timers.",
   commands: "Opening commands.",
   calendar: "Opening Calendar.",
+  drive: "Opening Google Drive.",
 };
 
 let viewReturnStack = [];
@@ -23,6 +25,7 @@ const VIEW_PANELS = {
   storage: () => viewPanelStorage,
   commands: () => viewPanelCommands,
   calendar: () => viewPanelCalendar,
+  drive: () => viewPanelDrive,
 };
 
 function isViewSessionActive() {
@@ -85,10 +88,16 @@ async function loadViewData(view) {
     }
     await loadCalendarView();
   }
+  if (view === "drive") {
+    if (typeof loadDriveView !== "function") {
+      throw new Error("Drive UI failed to load. Hard-refresh the page.");
+    }
+    await loadDriveView();
+  }
 }
 
 function applyViewSessionChrome(view) {
-  if (view === "calendar") {
+  if (view === "calendar" || view === "drive") {
     controlsHidden = true;
   } else {
     revealControlsForUiCommand();
@@ -176,7 +185,7 @@ function openViewModalShell(view) {
   viewModal.classList.add("open");
   viewModal.setAttribute("aria-hidden", "false");
   document.body.classList.add("view-modal-open");
-  document.body.classList.toggle("view-calendar-active", view === "calendar");
+  document.body.classList.toggle("view-calendar-active", view === "calendar" || view === "drive");
   setViewModalExpanded(true);
   if (viewModalClose) {
     viewModalClose.focus();
@@ -250,9 +259,15 @@ async function openViewSession(view, { source = "ui", fromViewBack = false } = {
       calendarError.textContent =
         error.message || "Could not open the calendar view.";
     }
+    if (view === "drive" && driveError) {
+      driveError.hidden = false;
+      driveError.textContent = error.message || "Could not open the Drive view.";
+    }
   }
 
-  if (source === "voice" || voiceModeEnabled) {
+  if (view === "drive") {
+    setVoiceStatus("Type your question in the Drive panel.");
+  } else if (source === "voice" || voiceModeEnabled) {
     ensureViewSessionListening();
   }
   renderState();

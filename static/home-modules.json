@@ -5,6 +5,8 @@
   "home-calendar-ui.js",
   "home-meeting-reminders.js",
   "home-calendar-recap.js",
+  "home-drive-core.js",
+  "home-drive-ui.js",
   "home-view-session.js",
   "home-tool-commands.js",
   "home-ui-commands.js",

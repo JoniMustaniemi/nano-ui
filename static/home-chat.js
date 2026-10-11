@@ -368,6 +368,13 @@ async function handleChatVoiceFollowUp(answerText, shouldSpeak, message) {
 }
 
 async function submitMessage(message, source, commandHint, options = {}) {
+  if (
+    source === "voice" &&
+    typeof getActiveViewSession === "function" &&
+    getActiveViewSession() === "drive"
+  ) {
+    return;
+  }
   const context = buildSubmitMessageContext(message, source, commandHint, options);
   const pendingReconnectKind = resolvePendingReconnectKind(message);
   if (!pendingReconnectKind) {

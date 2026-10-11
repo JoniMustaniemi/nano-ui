@@ -199,6 +199,13 @@ function detectWakeWordOnBuffer() {
 }
 
 async function flushPendingVoiceSubmit() {
+  if (
+    typeof getActiveViewSession === "function" &&
+    getActiveViewSession() === "drive"
+  ) {
+    clearPendingVoiceBuffer();
+    return;
+  }
   if (requestInFlight || speakingActive || countdownCreateInFlight || stopwatchCreateInFlight) {
     return;
   }
@@ -376,6 +383,9 @@ function shouldIgnoreDuplicateVoiceMessage(message) {
 
 function shouldPauseWakeWordListening() {
   if (!voiceModeEnabled || recognitionPaused) {
+    return true;
+  }
+  if (typeof getActiveViewSession === "function" && getActiveViewSession() === "drive") {
     return true;
   }
   if (requestInFlight || speakingActive || countdownCreateInFlight || stopwatchCreateInFlight) {

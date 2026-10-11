@@ -35,6 +35,14 @@ const SUPPLEMENTAL_TOOL_COMMANDS = [
     description: "Summarize today's calendar events.",
   },
   {
+    id: "open_drive",
+    label: "Google Drive",
+    message: "",
+    category: "Interface",
+    description: "Ask typed questions about Google Drive files.",
+    client_action: "open_drive",
+  },
+  {
     id: "debug_mode_on",
     label: "Debug mode on",
     message: "Turn on debug mode",
@@ -54,6 +62,7 @@ const COMMAND_ACTION_DESCRIPTIONS = {
   open_brains: "Open the activity and reasoning log.",
   open_storage: "Browse timers saved on the server.",
   open_calendar: "Open the full-screen calendar view.",
+  open_drive: "Open Google Drive Q&A (typed questions).",
   calendar_recap_today: "Summarize today's calendar events.",
 };
 const VOICE_YES_NO_PENDING_KINDS = new Set([
@@ -91,6 +100,7 @@ const VIEW_CLIENT_ACTIONS = {
   open_storage: "storage",
   open_commands: "commands",
   open_calendar: "calendar",
+  open_drive: "drive",
 };
 
 function resolveViewClientAction(command) {
@@ -172,6 +182,7 @@ const COMMANDS_RAIL_ICON_SVGS = {
   interface: `<svg ${COMMANDS_RAIL_ICON_ATTRS}><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>`,
   system: `<svg ${COMMANDS_RAIL_ICON_ATTRS}><path d="M4 12h3l2-5 4 10 2-5h7"/></svg>`,
   terminal: `<svg ${COMMANDS_RAIL_ICON_ATTRS}><path d="m7 8-4 4 4 4"/><path d="M11 16h9"/></svg>`,
+  drive: `<svg ${COMMANDS_RAIL_ICON_ATTRS}><path d="M14 4h5l3 3v13H7l-3-3V4z"/><path d="M14 4v4h4"/><path d="M9 13h6M9 17h4"/></svg>`,
 };
 
 const COMMAND_SECTION_ICON_SVGS = {
@@ -206,6 +217,9 @@ function commandActionIconKey(command) {
   const view = resolveViewClientAction(command);
   if (view === "calendar") {
     return "calendar";
+  }
+  if (view === "drive") {
+    return "drive";
   }
   if (view === "brains") {
     return "brains";

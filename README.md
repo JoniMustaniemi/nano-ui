@@ -35,6 +35,12 @@ Nano UI runs in the browser. Nano Core runs on the Raspberry Pi. Together they h
 - Switch between calendars from the screen
 - Set **meeting reminders** on upcoming events — 15 minutes, 30 minutes, or 1 hour before start
 
+### Google Drive
+
+- Open **Google Drive** from Commands to ask questions about files
+- Save Drive links locally in the browser, paste a link or file ID, or ask a general question with no file
+- Optional read-only preview via the Pi API; Nano reads files in agent mode when you ask
+
 ### Weather
 
 - See **current weather** using your browser’s location

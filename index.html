@@ -386,6 +386,70 @@ placeholder="No saved timers yet."
 
 </div>
 
+<div id="nano-panel-drive" class="view-panel nano-panel nano-panel-drive" hidden>
+
+<div id="drive-error" class="drive-error" hidden></div>
+
+<div class="drive-layout">
+
+<section class="drive-bookmarks" aria-label="Saved Drive links">
+
+<div class="drive-section-header">
+
+<span class="nano-panel-label">Saved links</span>
+
+<button id="drive-delete-link" class="drive-delete-link ghost" type="button" disabled>Delete</button>
+
+</div>
+
+<div id="drive-link-list" class="drive-link-list" role="listbox" aria-label="Drive bookmarks"></div>
+
+<div class="drive-add-form">
+
+<label class="drive-field-label" for="drive-add-label">Label</label>
+
+<input id="drive-add-label" class="drive-text-input" type="text" autocomplete="off" placeholder="Q3 budget" />
+
+<label class="drive-field-label" for="drive-add-url">Drive link</label>
+
+<input id="drive-add-url" class="drive-text-input" type="url" autocomplete="off" placeholder="https://drive.google.com/file/d/…/view" />
+
+<button id="drive-add-link" class="drive-add-link" type="button">Save link</button>
+
+</div>
+
+</section>
+
+<section class="drive-ask" aria-label="Ask about a Drive file">
+
+<label class="drive-field-label" for="drive-link-input">Link to file (optional)</label>
+
+<input id="drive-link-input" class="drive-text-input" type="text" autocomplete="off" placeholder="Paste a Drive URL or file ID (overrides selection)" />
+
+<p id="drive-link-error" class="drive-link-error" hidden></p>
+
+<label class="drive-field-label" for="drive-question-input">Question</label>
+
+<textarea id="drive-question-input" class="drive-question-input" rows="4" placeholder="Type your question…"></textarea>
+
+<button id="drive-ask-button" class="drive-ask-button" type="button" disabled>Ask Nano</button>
+
+<div id="drive-preview-panel" class="drive-preview-panel" hidden>
+
+<p id="drive-preview-meta" class="drive-preview-meta"></p>
+
+<p id="drive-preview-truncated" class="drive-preview-truncated" hidden>Preview truncated on server.</p>
+
+<pre id="drive-preview-body" class="drive-preview-body"></pre>
+
+</div>
+
+</section>
+
+</div>
+
+</div>
+
 <div id="view-panel-commands" class="view-panel view-panel-commands" hidden>
 
 <div class="commands-page">

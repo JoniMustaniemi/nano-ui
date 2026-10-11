@@ -2626,3 +2626,188 @@ body.inputs-locked .bottom-bar-btn:disabled {
     padding: 9px 10px 10px;
   }
 }
+
+/* ── Google Drive view ── */
+
+.nano-panel-drive {
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  padding: 12px 16px 16px;
+}
+
+.drive-error {
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 120, 120, 0.35);
+  border-radius: 10px;
+  background: rgba(120, 20, 20, 0.28);
+  color: rgba(255, 190, 190, 0.95);
+  font: 500 0.82rem/1.4 "Cascadia Mono", Consolas, monospace;
+}
+
+.drive-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 16px;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.drive-bookmarks,
+.drive-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.drive-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.drive-link-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: min(28dvh, 220px);
+  overflow: auto;
+  padding: 2px;
+}
+
+.drive-link-list-empty {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.82rem;
+}
+
+.drive-link-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.drive-link-item:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.drive-link-item.active {
+  border-color: rgba(120, 200, 255, 0.55);
+  background: rgba(40, 80, 120, 0.35);
+}
+
+.drive-link-item-label {
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.drive-link-item-url {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.55);
+  word-break: break-all;
+}
+
+.drive-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.drive-field-label {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.drive-text-input,
+.drive-question-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  color: inherit;
+  font: inherit;
+}
+
+.drive-question-input {
+  resize: vertical;
+  min-height: 96px;
+}
+
+.drive-link-error {
+  margin: 0;
+  font-size: 0.78rem;
+  color: rgba(255, 170, 170, 0.95);
+}
+
+.drive-add-link,
+.drive-ask-button {
+  align-self: flex-start;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(120, 200, 255, 0.45);
+  background: rgba(40, 90, 140, 0.45);
+  color: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.drive-add-link:disabled,
+.drive-ask-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.drive-delete-link {
+  font-size: 0.78rem;
+}
+
+.drive-preview-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.drive-preview-meta {
+  margin: 0;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.drive-preview-truncated {
+  margin: 0;
+  font-size: 0.72rem;
+  color: rgba(255, 210, 120, 0.9);
+}
+
+.drive-preview-body {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.3);
+  max-height: min(32dvh, 280px);
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: 500 0.75rem/1.45 "Cascadia Mono", Consolas, monospace;
+}
+
+@media (max-width: 800px) {
+  .drive-layout {
+    grid-template-columns: 1fr;
+  }
+}

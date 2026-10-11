@@ -1057,3 +1057,40 @@ def test_voice_mode_toggle_integration() -> None:
     )[0]
     assert "connectBrowserMicrophoneIfEnabled" not in init_voice_mode_fn
     assert "applyUnsupportedVoiceModeState" in init_voice_mode_fn
+
+
+def test_drive_integration() -> None:
+    modules = json.loads((STATIC_DIR / "home-modules.json").read_text(encoding="utf-8"))
+    drive_core_js = (STATIC_DIR / "home-drive-core.js").read_text(encoding="utf-8")
+    drive_ui_js = (STATIC_DIR / "home-drive-ui.js").read_text(encoding="utf-8")
+    view_session_js = (STATIC_DIR / "home-view-session.js").read_text(encoding="utf-8")
+    tool_commands_js = _load_tool_commands_js()
+    ui_commands_js = _load_ui_commands_js()
+    voice_js = _load_voice_js()
+    chat_js = (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
+    html_text = _load_index_html()
+    css_text = _load_home_css()
+    api_doc = (ROOT_DIR / "docs" / "drive-api.md").read_text(encoding="utf-8")
+    calendar_js = (STATIC_DIR / "home-calendar-core.js").read_text(encoding="utf-8")
+
+    assert "home-drive-core.js" in modules
+    assert "home-drive-ui.js" in modules
+    assert "DRIVE_LINKS_STORAGE_KEY" in drive_core_js
+    assert "parseDriveFileId" in drive_core_js
+    assert "composeDriveAgentMessage" in drive_core_js
+    assert "/api/drive/files/" in drive_core_js
+    assert "Context file" not in drive_core_js
+    assert "loadDriveView" in drive_ui_js
+    assert "submitDriveQuestion" in drive_ui_js
+    assert 'drive: "Google Drive"' in view_session_js
+    assert "open_drive" in tool_commands_js
+    assert 'open_drive: "drive"' in tool_commands_js
+    assert "client_action: \"open_drive\"" in tool_commands_js
+    assert "DRIVE_SECTION_PATTERNS" not in ui_commands_js
+    assert 'getActiveViewSession() === "drive"' in voice_js
+    assert 'getActiveViewSession() === "drive"' in chat_js
+    assert 'id="nano-panel-drive"' in html_text
+    assert ".nano-panel-drive" in css_text
+    assert "/api/drive/files/" in api_doc
+    assert "nano-core auth-google" in api_doc
+    assert "nano-core auth-google" in calendar_js
