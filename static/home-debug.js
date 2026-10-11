@@ -32,14 +32,11 @@ function saveDebugModeEnabled(enabled) {
 }
 
 function syncDebugToggleUi() {
-  if (debugModeOnBtn) {
-    debugModeOnBtn.classList.toggle("active", debugModeEnabled);
-    debugModeOnBtn.setAttribute("aria-pressed", debugModeEnabled ? "true" : "false");
+  if (!debugModeToggle) {
+    return;
   }
-  if (debugModeOffBtn) {
-    debugModeOffBtn.classList.toggle("active", !debugModeEnabled);
-    debugModeOffBtn.setAttribute("aria-pressed", !debugModeEnabled ? "true" : "false");
-  }
+  debugModeToggle.checked = debugModeEnabled;
+  debugModeToggle.setAttribute("aria-checked", debugModeEnabled ? "true" : "false");
 }
 
 function setDebugField(fieldName, value) {
@@ -169,16 +166,10 @@ function initDebugControl() {
   if (debugModeEnabled) {
     syncDebugNanoState();
   }
-  if (debugModeOnBtn && debugModeOnBtn.dataset.bound !== "true") {
-    debugModeOnBtn.dataset.bound = "true";
-    debugModeOnBtn.addEventListener("click", () => {
-      setDebugModeEnabled(true);
-    });
-  }
-  if (debugModeOffBtn && debugModeOffBtn.dataset.bound !== "true") {
-    debugModeOffBtn.dataset.bound = "true";
-    debugModeOffBtn.addEventListener("click", () => {
-      setDebugModeEnabled(false);
+  if (debugModeToggle && debugModeToggle.dataset.bound !== "true") {
+    debugModeToggle.dataset.bound = "true";
+    debugModeToggle.addEventListener("change", () => {
+      setDebugModeEnabled(debugModeToggle.checked);
     });
   }
 }

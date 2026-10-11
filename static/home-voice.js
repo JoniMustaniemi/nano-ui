@@ -115,15 +115,12 @@ function saveVoiceModeEnabled(enabled) {
 
 function syncVoiceModeToggleUi() {
   const supported = isVoiceRecognitionSupported();
-  if (voiceModeOnBtn) {
-    voiceModeOnBtn.classList.toggle("active", voiceModeEnabled);
-    voiceModeOnBtn.setAttribute("aria-pressed", voiceModeEnabled ? "true" : "false");
-    voiceModeOnBtn.disabled = !supported;
+  if (!voiceModeToggle) {
+    return;
   }
-  if (voiceModeOffBtn) {
-    voiceModeOffBtn.classList.toggle("active", !voiceModeEnabled);
-    voiceModeOffBtn.setAttribute("aria-pressed", !voiceModeEnabled ? "true" : "false");
-  }
+  voiceModeToggle.checked = voiceModeEnabled;
+  voiceModeToggle.setAttribute("aria-checked", voiceModeEnabled ? "true" : "false");
+  voiceModeToggle.disabled = !supported;
 }
 
 function setVoiceSupportNotice(text) {
@@ -1002,16 +999,10 @@ function initVoiceModeControl() {
     voiceModeEnabled = false;
   }
   syncVoiceModeToggleUi();
-  if (voiceModeOnBtn && voiceModeOnBtn.dataset.bound !== "true") {
-    voiceModeOnBtn.dataset.bound = "true";
-    voiceModeOnBtn.addEventListener("click", () => {
-      void setVoiceModeEnabled(true);
-    });
-  }
-  if (voiceModeOffBtn && voiceModeOffBtn.dataset.bound !== "true") {
-    voiceModeOffBtn.dataset.bound = "true";
-    voiceModeOffBtn.addEventListener("click", () => {
-      void setVoiceModeEnabled(false);
+  if (voiceModeToggle && voiceModeToggle.dataset.bound !== "true") {
+    voiceModeToggle.dataset.bound = "true";
+    voiceModeToggle.addEventListener("change", () => {
+      void setVoiceModeEnabled(voiceModeToggle.checked);
     });
   }
 }

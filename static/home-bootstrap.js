@@ -30,6 +30,11 @@ commandsToggle.addEventListener("click", () => {
 if (viewModalClose) {
   viewModalClose.addEventListener("click", () => closeViewSession({ reason: "ui" }));
 }
+if (viewModalBack) {
+  viewModalBack.addEventListener("click", () => {
+    void goBackViewSession();
+  });
+}
 if (viewModalPanel) {
   viewModalPanel.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {

@@ -410,13 +410,13 @@ function createMeetingReminderControl(event) {
   label.textContent = copy.remindLabel;
 
   const toggle = document.createElement("div");
-  toggle.className = "meeting-reminder-toggle voice-mode-toggle";
+  toggle.className = "meeting-reminder-toggle commands-choice-toggle";
   toggle.setAttribute("role", "group");
   toggle.setAttribute("aria-label", copy.remindLabel);
 
   const offBtn = document.createElement("button");
   offBtn.type = "button";
-  offBtn.className = "voice-mode-btn meeting-reminder-btn";
+  offBtn.className = "commands-choice meeting-reminder-btn";
   offBtn.dataset.lead = "0";
   offBtn.textContent = copy.remindOff;
   offBtn.addEventListener("click", () => {
@@ -428,7 +428,7 @@ function createMeetingReminderControl(event) {
   for (const lead of MEETING_REMINDER_LEAD_OPTIONS) {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "voice-mode-btn meeting-reminder-btn";
+    button.className = "commands-choice meeting-reminder-btn";
     button.dataset.lead = String(lead);
     if (lead === 15) {
       button.textContent = copy.remind15;

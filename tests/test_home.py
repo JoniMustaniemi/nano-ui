@@ -268,12 +268,17 @@ def test_connection_settings_in_commands_panel() -> None:
 
     assert 'id="nano-connection-url"' in html_text
     assert 'id="nano-connection-key"' in html_text
-    assert 'id="connection-settings-dropdown"' in html_text
-    assert "commands-connection-dropdown" in html_text
-    assert "nano-ui connection settings" in html_text
+    assert 'id="commands-rail"' in html_text
+    assert 'id="commands-panel-connection"' in html_text
+    assert 'id="connection-status-badge"' in html_text
+    assert 'id="view-modal-subtitle"' in html_text
+    assert "commands-page" in html_text
+    assert "commands-rail-btn" in html_text
+    assert "refreshConnectionStatusBadge" in settings_js
+    assert "connection-help" not in html_text
     assert "http://&lt;PI-IP&gt;:8080" in html_text
-    assert "hailo-ollama" in html_text
-    assert "CORS_ALLOWED_ORIGINS" in html_text
+    assert "hailo-ollama" in settings_js
+    assert "CORS_ALLOWED_ORIGINS" not in html_text
     assert "initConnectionSettings" in settings_js
     assert "validateConnectionUrl" in settings_js
     assert "Wrong API key" in api_js
@@ -293,7 +298,11 @@ def test_connection_settings_in_commands_panel() -> None:
     assert "handleConnectionAuthFailure" in settings_js
     assert "isWrongApiKeyError" in settings_js
     assert "normalizeConnectionInputUrl" in settings_js
-    assert "Hosted UI:" in html_text
+    assert "initCommandsRail" in (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+    assert "setCommandsSection" in (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+    assert 'id="view-modal-back"' in html_text
+    assert "goBackViewSession" in view_session_js
+    assert "viewReturnStack" in view_session_js
     assert "isSameOriginApiUrl" in api_js
     assert "normalizeStoredApiUrl" in api_js
     assert "migrateStoredApiUrl" in api_js
@@ -806,7 +815,7 @@ def test_debug_panel_integration() -> None:
     assert "initDebugControl" in debug_js
     assert "syncDebugNanoState" in debug_js
     assert "data-debug-field" in html_text
-    assert 'id="debug-mode-on"' in html_text
+    assert 'id="debug-mode-toggle"' in html_text
     assert "initDebugControl" in bootstrap_js
     assert ".nano-debug-panel" in css_text
     assert "updateDebugVoiceRecognition" in debug_js
@@ -915,8 +924,7 @@ def test_voice_mode_toggle_integration() -> None:
     bootstrap_js = (STATIC_DIR / "home-bootstrap.js").read_text(encoding="utf-8")
     css_text = _load_home_css()
 
-    assert 'id="voice-mode-on"' in html_text
-    assert 'id="voice-mode-off"' in html_text
+    assert 'id="voice-mode-toggle"' in html_text
     assert 'id="voice-support-notice"' in html_text
     assert "voiceSupportNotice" in dom_js
     assert "voiceModeEnabled" in state_js
@@ -927,7 +935,8 @@ def test_voice_mode_toggle_integration() -> None:
     assert "initVoiceModeControl" in bootstrap_js
     assert '"voice_mode"' in ui_js
     assert 'id="voice-push-toggle"' not in html_text
-    assert ".voice-mode-toggle" in css_text
+    assert ".commands-switch" in css_text
+    assert "commandActionDescription" in ui_js
     set_voice_mode_fn = voice_js.split("async function setVoiceModeEnabled", 1)[1].split(
         "function initVoiceModeControl",
         1,

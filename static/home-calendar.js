@@ -167,15 +167,13 @@ function applyCalendarLocaleUi() {
   if (calendarDayClose) {
     calendarDayClose.setAttribute("aria-label", copy.closeDay);
   }
-  if (calendarLangEn) {
-    const isEnglish = calendarLocale === "en";
-    calendarLangEn.classList.toggle("active", isEnglish);
-    calendarLangEn.setAttribute("aria-pressed", isEnglish ? "true" : "false");
-  }
-  if (calendarLangFi) {
+  if (calendarLangToggle) {
     const isFinnish = calendarLocale === "fi";
-    calendarLangFi.classList.toggle("active", isFinnish);
-    calendarLangFi.setAttribute("aria-pressed", isFinnish ? "true" : "false");
+    calendarLangToggle.checked = isFinnish;
+    calendarLangToggle.setAttribute("aria-checked", isFinnish ? "true" : "false");
+  }
+  if (calendarLangLabel) {
+    calendarLangLabel.textContent = calendarLocale === "fi" ? "FI" : "EN";
   }
 }
 
@@ -1288,14 +1286,10 @@ function bindCalendarControls() {
       void refreshCalendarData({ reason: "view" });
     });
   }
-  if (calendarLangEn) {
-    calendarLangEn.addEventListener("click", () => {
-      setCalendarLocale("en");
-    });
-  }
-  if (calendarLangFi) {
-    calendarLangFi.addEventListener("click", () => {
-      setCalendarLocale("fi");
+  if (calendarLangToggle && calendarLangToggle.dataset.bound !== "true") {
+    calendarLangToggle.dataset.bound = "true";
+    calendarLangToggle.addEventListener("change", () => {
+      setCalendarLocale(calendarLangToggle.checked ? "fi" : "en");
     });
   }
   if (calendarDayClose) {

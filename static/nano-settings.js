@@ -1,6 +1,8 @@
 const CONNECTION_POLL_INTERVAL_MS = 5_000;
 
 let connectionSettingsInitialized = false;
+const connectionStatusBadge = document.getElementById("connection-status-badge");
+const connectionStatusCard = document.getElementById("connection-status-card");
 let connectionPollAbort = null;
 let connectionCompleting = false;
 
@@ -10,6 +12,49 @@ function refreshConnectionFields() {
   }
   connectionUrlInput.value = getConfiguredApiUrl();
   connectionKeyInput.value = getApiKey();
+}
+
+function setConnectionStatusPresentation(state, label, detail = "") {
+  if (connectionStatusCard) {
+    connectionStatusCard.dataset.state = state;
+  }
+  if (connectionStatusBadge) {
+    connectionStatusBadge.textContent = label;
+  }
+  if (!connectionStatus) {
+    return;
+  }
+  const message = (detail || "").trim();
+  connectionStatus.textContent = message;
+  connectionStatus.hidden = !message;
+}
+
+async function refreshConnectionStatusBadge() {
+  if (!hasApiConnection()) {
+    setConnectionStatusPresentation("offline", "Not configured", "Enter your Pi API URL and key, then test the connection.");
+    return;
+  }
+  setConnectionStatusPresentation("pending", "Checking…", "Verifying API health…");
+  try {
+    const payload = await checkApiHealth();
+    const app = payload?.app ? String(payload.app) : "Nano Core";
+    const status = payload?.status ? String(payload.status) : "ok";
+    setConnectionStatusPresentation(
+      "connected",
+      "Connected",
+      `Reachable — ${app} (${status}).`
+    );
+  } catch (error) {
+    if (isWrongApiKeyError(error)) {
+      setConnectionStatusPresentation("error", "Auth failed", "API key was rejected. Check API_KEY on the Pi.");
+      return;
+    }
+    setConnectionStatusPresentation(
+      "error",
+      "Disconnected",
+      error?.message || "Could not reach the API."
+    );
+  }
 }
 
 function normalizeConnectionInputUrl(url) {
@@ -104,38 +149,40 @@ function initConnectionSettings() {
       const connectionUrl = normalizeConnectionInputUrl(connectionUrlInput.value);
       const urlValidationError = validateConnectionUrl(connectionUrl);
       if (urlValidationError) {
-        if (connectionStatus) {
-          connectionStatus.textContent = urlValidationError;
-        }
+        setConnectionStatusPresentation("error", "Invalid URL", urlValidationError);
         return;
       }
 
       setApiConnection(connectionUrl, connectionKeyInput.value);
       connectionUrlInput.value = connectionUrl;
       if (!hasApiConnection()) {
-        if (connectionStatus) {
-          connectionStatus.textContent = "API URL is required.";
-        }
+        setConnectionStatusPresentation("offline", "Not configured", "API URL is required.");
         return;
       }
-      if (connectionStatus) {
-        connectionStatus.textContent = "Testing connection...";
-      }
+      setConnectionStatusPresentation("pending", "Testing…", "Contacting Nano Core…");
       try {
         const payload = await checkApiHealth();
-        if (connectionStatus) {
-          connectionStatus.textContent = `Connected to ${payload.app} (${payload.status}).`;
-        }
+        const app = payload?.app ? String(payload.app) : "Nano Core";
+        const status = payload?.status ? String(payload.status) : "ok";
+        setConnectionStatusPresentation(
+          "connected",
+          "Connected",
+          `Reachable — ${app} (${status}).`
+        );
         await handleConnectionSuccess();
       } catch (error) {
-        if (connectionStatus) {
-          connectionStatus.textContent = error.message;
-        }
+        const authFailed = isWrongApiKeyError(error);
+        setConnectionStatusPresentation(
+          authFailed ? "error" : "error",
+          authFailed ? "Auth failed" : "Connection failed",
+          error?.message || "Could not reach the API."
+        );
       }
     });
   }
 
   refreshConnectionFields();
+  void refreshConnectionStatusBadge();
 }
 
 async function handleConnectionSuccess() {
@@ -226,11 +273,8 @@ async function openConnectionSettings() {
   if (typeof initConnectionSettings === "function") {
     initConnectionSettings();
   }
-  if (connectionSettingsDropdown) {
-    connectionSettingsDropdown.open = true;
-  }
-  if (connectionSettingsSection) {
-    connectionSettingsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (typeof setCommandsSection === "function") {
+    setCommandsSection("connection");
   }
 }
 
@@ -269,3 +313,4 @@ async function ensureApiConnection() {
 window.ensureApiConnection = ensureApiConnection;
 window.initConnectionSettings = initConnectionSettings;
 window.openConnectionSettings = openConnectionSettings;
+window.refreshConnectionStatusBadge = refreshConnectionStatusBadge;

@@ -46,6 +46,9 @@ const EXCLUDED_TOOL_COMMAND_IDS = new Set([
   "capabilities",
   "toggle_controls",
   "list_internal_notes",
+  "open_commands",
+  "debug_mode_on",
+  "debug_mode_off",
 ]);
 const SUPPLEMENTAL_TOOL_COMMANDS = [
   {
@@ -53,20 +56,30 @@ const SUPPLEMENTAL_TOOL_COMMANDS = [
     label: "Today's meetings",
     message: "Do I have any meetings today?",
     category: "Calendar",
+    description: "Summarize today's calendar events.",
   },
   {
     id: "debug_mode_on",
     label: "Debug mode on",
     message: "Turn on debug mode",
     category: "System",
+    description: "Show live diagnostics on the home screen.",
   },
   {
     id: "debug_mode_off",
     label: "Debug mode off",
     message: "Turn off debug mode",
     category: "System",
+    description: "Hide the on-screen diagnostics panel.",
   },
 ];
+
+const COMMAND_ACTION_DESCRIPTIONS = {
+  open_brains: "Open the activity and reasoning log.",
+  open_storage: "Browse timers saved on the server.",
+  open_calendar: "Open the full-screen calendar view.",
+  calendar_recap_today: "Summarize today's calendar events.",
+};
 const VOICE_YES_NO_PENDING_KINDS = new Set([
   "wipe_confirmation",
   "reboot_confirmation",
@@ -151,6 +164,225 @@ function groupCommands(commands) {
   });
 }
 
+const COMMAND_SECTION_META = {
+  Calendar: {
+    subtitle: "Manage your calendar integration.",
+    icon: "calendar",
+  },
+  Timers: {
+    subtitle: "Start, check, and manage timers.",
+    icon: "clock",
+  },
+  Interface: {
+    subtitle: "Control the interface and data views.",
+    icon: "interface",
+  },
+  System: {
+    subtitle: "Diagnostics and assistant controls.",
+    icon: "system",
+  },
+  Other: {
+    subtitle: "Quick actions and shortcuts.",
+    icon: "terminal",
+  },
+};
+
+const COMMANDS_RAIL_ICON_ATTRS =
+  'class="commands-rail-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"';
+
+const COMMANDS_RAIL_ICON_SVGS = {
+  calendar: `<svg ${COMMANDS_RAIL_ICON_ATTRS}><path d="M8 3v3M16 3v3M4 9h16"/><rect x="4" y="6" width="16" height="14" rx="2"/></svg>`,
+  clock: `<svg ${COMMANDS_RAIL_ICON_ATTRS}><circle cx="12" cy="12" r="8"/><path d="M12 8v4.5l2.75 2.75"/></svg>`,
+  interface: `<svg ${COMMANDS_RAIL_ICON_ATTRS}><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>`,
+  system: `<svg ${COMMANDS_RAIL_ICON_ATTRS}><path d="M4 12h3l2-5 4 10 2-5h7"/></svg>`,
+  terminal: `<svg ${COMMANDS_RAIL_ICON_ATTRS}><path d="m7 8-4 4 4 4"/><path d="M11 16h9"/></svg>`,
+};
+
+const COMMAND_SECTION_ICON_SVGS = {
+  calendar: COMMANDS_RAIL_ICON_SVGS.calendar,
+  clock: COMMANDS_RAIL_ICON_SVGS.clock,
+  interface: COMMANDS_RAIL_ICON_SVGS.interface,
+  system: COMMANDS_RAIL_ICON_SVGS.system,
+  terminal: COMMANDS_RAIL_ICON_SVGS.terminal,
+  brains: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.5 4A5.5 5.5 0 0 0 4 9.5c0 1.2.38 2.31 1.03 3.22L4 20l7.28-1.03A5.5 5.5 0 1 0 9.5 4z"/><path d="M14 8.5c2.5.6 4.5 2.8 4.5 5.5a5.5 5.5 0 0 1-5.5 5.5c-.9 0-1.75-.22-2.5-.6L7 20l1.05-3.45A5.48 5.48 0 0 1 6 14c0-2.9 2.2-5.2 5-5.5"/></svg>`,
+  storage: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.66 3.58 3 8 3s8-1.34 8-3V6"/><path d="M4 12v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>`,
+  meetings: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v4"/><path d="M16 2v4"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/></svg>`,
+};
+
+function commandSectionMeta(category) {
+  const normalized = String(category || "").trim();
+  const knownKey = Object.keys(COMMAND_SECTION_META).find(
+    (name) => name.toLowerCase() === normalized.toLowerCase()
+  );
+  if (knownKey) {
+    return COMMAND_SECTION_META[knownKey];
+  }
+  if (/timer/i.test(normalized)) {
+    return COMMAND_SECTION_META.Timers;
+  }
+  return {
+    subtitle: COMMAND_SECTION_META.Other.subtitle,
+    icon: "terminal",
+  };
+}
+
+function commandActionIconKey(command) {
+  const view = resolveViewClientAction(command);
+  if (view === "calendar") {
+    return "calendar";
+  }
+  if (view === "brains") {
+    return "brains";
+  }
+  if (view === "storage") {
+    return "storage";
+  }
+  if (view === "commands") {
+    return "terminal";
+  }
+  const id = String(command?.id || "").toLowerCase();
+  if (id.includes("meeting") || id.includes("calendar")) {
+    return "meetings";
+  }
+  if (id.includes("timer") || id.includes("stopwatch")) {
+    return "clock";
+  }
+  const category = String(command?.category || "").toLowerCase();
+  if (category.includes("timer")) {
+    return "clock";
+  }
+  return "terminal";
+}
+
+function createCommandIconElement(iconKey) {
+  const icon = document.createElement("span");
+  icon.className = "commands-action-card__icon";
+  icon.setAttribute("aria-hidden", "true");
+  icon.innerHTML = COMMAND_SECTION_ICON_SVGS[iconKey] || COMMAND_SECTION_ICON_SVGS.terminal;
+  return icon;
+}
+
+function commandActionDescription(command) {
+  const explicit = String(command?.description || "").trim();
+  if (explicit) {
+    return explicit;
+  }
+
+  const id = String(command?.id || "").trim().toLowerCase();
+  if (COMMAND_ACTION_DESCRIPTIONS[id]) {
+    return COMMAND_ACTION_DESCRIPTIONS[id];
+  }
+
+  const clientAction = String(command?.client_action || "").trim().toLowerCase();
+  if (COMMAND_ACTION_DESCRIPTIONS[clientAction]) {
+    return COMMAND_ACTION_DESCRIPTIONS[clientAction];
+  }
+
+  const view = resolveViewClientAction(command);
+  if (view === "brains") {
+    return "Open the activity and reasoning log.";
+  }
+  if (view === "storage") {
+    return "Browse timers saved on the server.";
+  }
+  if (view === "calendar") {
+    return "Open the full-screen calendar view.";
+  }
+
+  if (isTimerToolCommand(command)) {
+    return "Start or manage a timer by voice.";
+  }
+
+  const message = String(command?.message || "").trim();
+  if (message) {
+    const shortened = message.length > 80 ? `${message.slice(0, 77)}…` : message;
+    return `Says: “${shortened}”`;
+  }
+
+  const label = String(command?.label || "").trim();
+  if (label) {
+    return `Runs the “${label}” quick action.`;
+  }
+  return "Run this quick action.";
+}
+
+function commandCategorySectionId(category) {
+  const slug = String(category || "other")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+  return `category-${slug || "other"}`;
+}
+
+function isSystemCommandCategory(category) {
+  return String(category || "").trim().toLowerCase() === "system";
+}
+
+let currentCommandsSection = "connection";
+
+function applyCommandsSectionVisual(sectionId) {
+  const page = document.querySelector(".commands-page");
+  if (!page || !sectionId) {
+    return;
+  }
+  for (const button of page.querySelectorAll(".commands-rail-btn")) {
+    const active = button.dataset.commandsSection === sectionId;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-current", active ? "true" : "false");
+  }
+  for (const panel of page.querySelectorAll(".commands-stage-panel")) {
+    const active = panel.dataset.commandsSection === sectionId;
+    panel.classList.toggle("is-active", active);
+    panel.hidden = !active;
+  }
+}
+
+function setCommandsSection(sectionId) {
+  if (!sectionId || sectionId === currentCommandsSection) {
+    return;
+  }
+  currentCommandsSection = sectionId;
+  applyCommandsSectionVisual(sectionId);
+}
+
+function initCommandsRail() {
+  const rail = document.getElementById("commands-rail");
+  if (!rail || rail.dataset.bound === "true") {
+    return;
+  }
+  rail.dataset.bound = "true";
+  rail.addEventListener("click", (event) => {
+    const button = event.target.closest(".commands-rail-btn");
+    if (!button) {
+      return;
+    }
+    setCommandsSection(button.dataset.commandsSection || "");
+  });
+}
+
+function clearCommandActionCards(grid) {
+  if (!grid) {
+    return;
+  }
+  for (const card of grid.querySelectorAll(".commands-action-card")) {
+    card.remove();
+  }
+}
+
+function appendCommandsRailButton(sectionId, label, iconKey) {
+  if (!commandsRailCategories) {
+    return;
+  }
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "commands-rail-btn";
+  button.dataset.commandsSection = sectionId;
+  button.setAttribute("aria-label", label);
+  button.title = label;
+  button.innerHTML = COMMANDS_RAIL_ICON_SVGS[iconKey] || COMMANDS_RAIL_ICON_SVGS.terminal;
+  commandsRailCategories.append(button);
+}
+
 function renderToolCommands(commands) {
   if (!commandsList) {
     return;
@@ -161,36 +393,78 @@ function renderToolCommands(commands) {
   }
   toolCommands = commands;
   commandsList.replaceChildren();
+  if (commandsRailCategories) {
+    commandsRailCategories.replaceChildren();
+  }
   for (const [category, items] of groupCommands(commands)) {
-    const dropdown = document.createElement("details");
-    dropdown.className = "commands-dropdown";
+    const meta = commandSectionMeta(category);
+    const sectionId = commandCategorySectionId(category);
+    appendCommandsRailButton(sectionId, category, meta.icon);
 
-    const summary = document.createElement("summary");
-    summary.className = "commands-dropdown-toggle";
-    summary.textContent = category;
+    const useSystemPanel = isSystemCommandCategory(category);
+    let section;
+    let grid;
+    if (useSystemPanel) {
+      section = document.getElementById("commands-panel-system");
+      grid = document.getElementById("commands-system-action-grid");
+      if (!section || !grid) {
+        continue;
+      }
+      clearCommandActionCards(grid);
+      section.hidden = true;
+      section.classList.remove("is-active");
+    } else {
+      section = document.createElement("section");
+      section.className = "commands-stage-panel commands-stage-panel--category";
+      section.dataset.commandsSection = sectionId;
+      section.hidden = true;
 
-    const grid = document.createElement("div");
-    grid.className = "commands-group-grid";
+      const header = document.createElement("header");
+      header.className = "commands-stage-header";
+      const heading = document.createElement("div");
+      heading.className = "commands-stage-heading";
+      const title = document.createElement("h3");
+      title.className = "commands-stage-title";
+      title.textContent = category;
+      const subtitle = document.createElement("p");
+      subtitle.className = "commands-stage-subtitle";
+      subtitle.textContent = meta.subtitle;
+      heading.append(title, subtitle);
+      header.append(heading);
+      section.append(header);
+
+      grid = document.createElement("div");
+      grid.className = "commands-action-grid";
+    }
 
     for (const command of items) {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = "command-button";
+      button.className = "command-button commands-action-card";
       button.dataset.commandId = command.id || "";
       button.dataset.clientAction = command.client_action || "";
       button.dataset.commandMessage = command.message;
 
+      button.append(createCommandIconElement(commandActionIconKey(command)));
+
+      const copy = document.createElement("span");
+      copy.className = "commands-action-card__copy";
       const label = document.createElement("span");
       label.className = "command-button-label";
       label.textContent = command.label;
+      copy.append(label);
+      const description = document.createElement("span");
+      description.className = "command-button-description";
+      description.textContent = commandActionDescription(command);
+      copy.append(description);
+      button.append(copy);
 
-      button.append(label);
-      if (command.description) {
-        const description = document.createElement("span");
-        description.className = "command-button-description";
-        description.textContent = command.description;
-        button.append(description);
-      }
+      const chevron = document.createElement("span");
+      chevron.className = "commands-action-card__chevron";
+      chevron.setAttribute("aria-hidden", "true");
+      chevron.innerHTML =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 6l6 6-6 6"/></svg>';
+      button.append(chevron);
 
       button.addEventListener("click", () => {
         void runToolCommand(command);
@@ -198,9 +472,10 @@ function renderToolCommands(commands) {
       grid.append(button);
     }
 
-    dropdown.append(summary, grid);
-    dropdown.open = true;
-    commandsList.append(dropdown);
+    if (!useSystemPanel) {
+      section.append(grid);
+      commandsList.append(section);
+    }
   }
 }
 
@@ -281,7 +556,8 @@ function syncInputActions() {
 }
 
 function setCommandButtonsDisabled(disabled) {
-  for (const button of commandsList.querySelectorAll(".command-button")) {
+  const root = viewPanelCommands || document;
+  for (const button of root.querySelectorAll(".command-button")) {
     button.disabled = disabled;
   }
 }
@@ -318,35 +594,21 @@ function updateInputLock() {
   messageBox.disabled = locked;
   sendButton.disabled = locked;
   commandsToggle.disabled = locked;
-  if (voiceModeOnBtn) {
+  if (voiceModeToggle) {
     const voiceSupported =
       typeof isVoiceRecognitionSupported === "function"
         ? isVoiceRecognitionSupported()
         : Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
-    voiceModeOnBtn.disabled = locked || !voiceSupported;
-  }
-  if (voiceModeOffBtn) {
-    voiceModeOffBtn.disabled = locked;
+    voiceModeToggle.disabled = locked || !voiceSupported;
   }
   setCommandButtonsDisabled(locked);
   syncInputActions();
   document.body.classList.toggle("inputs-locked", locked);
 }
 
-function expandCommandDropdowns() {
-  for (const dropdown of commandsList.querySelectorAll(".commands-dropdown")) {
-    dropdown.open = true;
-  }
-}
+function expandCommandDropdowns() {}
 
-function closeCommandDropdowns() {
-  if (!commandsList) {
-    return;
-  }
-  for (const dropdown of commandsList.querySelectorAll(".commands-dropdown")) {
-    dropdown.removeAttribute("open");
-  }
-}
+function closeCommandDropdowns() {}
 
 function isExcludedToolCommand(command) {
   const category = String(command?.category || "").trim().toLowerCase();

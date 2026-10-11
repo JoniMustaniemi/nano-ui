@@ -20,7 +20,7 @@
 <script src="./config.js"></script>
 <script defer src="./static/nano-api.js?v=3"></script>
 <script defer src="./static/nano-connection-overlay.js?v=1"></script>
-<script defer src="./static/nano-settings.js?v=2"></script>
+<script defer src="./static/nano-settings.js?v=4"></script>
 <script type="importmap">
 {
   "imports": {
@@ -175,7 +175,16 @@ aria-labelledby="view-modal-title"
 
 <header class="view-modal-header">
 
+<div class="view-modal-header-start">
+<button type="button" id="view-modal-back" class="view-modal-back ghost" hidden>
+<svg class="view-modal-back-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+<span class="view-modal-back-label">Back</span>
+</button>
+<div class="view-modal-heading">
 <h2 id="view-modal-title" class="view-modal-title">Brains</h2>
+<p id="view-modal-subtitle" class="view-modal-subtitle" hidden></p>
+</div>
+</div>
 
 <button id="view-modal-close" class="ghost chrome-close-btn" type="button" aria-label="Close">
 
@@ -265,12 +274,12 @@ placeholder="No saved timers yet."
 
 </div>
 
-<div class="calendar-lang-toggle" role="group" aria-label="Calendar language">
-
-<button id="calendar-lang-en" class="calendar-lang-btn active" type="button" aria-pressed="true">EN</button>
-
-<button id="calendar-lang-fi" class="calendar-lang-btn" type="button" aria-pressed="false">FI</button>
-
+<div class="commands-switch-field commands-switch-field--calendar-lang">
+<span class="commands-switch-field__label" id="calendar-lang-label">EN</span>
+<label class="commands-switch" for="calendar-lang-toggle">
+<input id="calendar-lang-toggle" class="commands-switch__input" type="checkbox" role="switch" aria-labelledby="calendar-lang-label" />
+<span class="commands-switch__track" aria-hidden="true"><span class="commands-switch__thumb"></span></span>
+</label>
 </div>
 
 </div>
@@ -293,13 +302,13 @@ placeholder="No saved timers yet."
 
 <div class="calendar-toolbar-row calendar-toolbar-row--views">
 
-<div class="calendar-view-toggle" role="tablist" aria-label="Calendar view">
+<div class="commands-choice-toggle calendar-view-toggle" role="tablist" aria-label="Calendar view">
 
-<button id="calendar-view-month" class="calendar-view-btn active" type="button" role="tab" aria-selected="true">Month</button>
+<button id="calendar-view-month" class="commands-choice active" type="button" role="tab" aria-selected="true">Month</button>
 
-<button id="calendar-view-week" class="calendar-view-btn" type="button" role="tab" aria-selected="false">Week</button>
+<button id="calendar-view-week" class="commands-choice" type="button" role="tab" aria-selected="false">Week</button>
 
-<button id="calendar-view-day" class="calendar-view-btn" type="button" role="tab" aria-selected="false">Day</button>
+<button id="calendar-view-day" class="commands-choice" type="button" role="tab" aria-selected="false">Day</button>
 
 </div>
 
@@ -379,48 +388,61 @@ placeholder="No saved timers yet."
 
 <div id="view-panel-commands" class="view-panel view-panel-commands" hidden>
 
-<details id="connection-settings-dropdown" class="commands-dropdown commands-connection-dropdown">
-<summary class="commands-dropdown-toggle">Connection</summary>
-<section class="commands-settings-section commands-connection-settings" aria-label="Connection settings">
-<div class="connection-help">
-<p class="connection-help-title">nano-ui connection settings</p>
-<ul class="connection-help-list">
-<li><strong>Hosted UI:</strong> leave API URL blank — this site proxies <code>/api/*</code> to your Pi</li>
-<li><strong>Direct LAN access:</strong> API URL <code>http://&lt;PI-IP&gt;:8080</code></li>
-<li><strong>API key:</strong> same value as <code>API_KEY</code> in <code>/home/nano/nano-core/.env</code></li>
-</ul>
-<p class="connection-help-subtitle">Do not use</p>
-<ul class="connection-help-list connection-help-warnings">
-<li><code>http://localhost:8080</code> from another PC — that is your PC, not the Pi</li>
-<li><code>http://&lt;PI-IP&gt;:8000</code> — that is hailo-ollama, not Nano</li>
-</ul>
-<p class="connection-help-subtitle">Get Pi IP on the Pi</p>
-<pre class="connection-help-code"><code>hostname -I</code></pre>
-<p class="connection-help-subtitle">Test from your PC before opening nano-ui</p>
-<pre class="connection-help-code"><code>curl http://&lt;PI-IP&gt;:8080/api/health</code></pre>
-<p class="connection-help-subtitle">If the page loads but chat/API fails</p>
-<ul class="connection-help-list">
-<li>F12 → Network → <strong>401</strong> = wrong API key</li>
-<li>F12 → Network → <strong>CORS</strong> = add UI origin to Pi <code>.env</code>:<br /><code>CORS_ALLOWED_ORIGINS=["http://localhost:3000"]</code><br />then: <code>sudo systemctl restart nano-core</code></li>
-</ul>
+<div class="commands-page">
+
+<nav class="commands-rail" id="commands-rail" aria-label="Command sections">
+<button type="button" class="commands-rail-btn is-active" data-commands-section="connection" aria-label="Connection" title="Connection" aria-current="true">
+<svg class="commands-rail-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="1.5"/><path d="M7 11v7M17 11v7M5 18h14"/></svg>
+</button>
+<button type="button" class="commands-rail-btn" data-commands-section="voice" aria-label="Voice" title="Voice">
+<svg class="commands-rail-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/></svg>
+</button>
+<div id="commands-rail-categories" class="commands-rail-categories"></div>
+</nav>
+
+<div class="commands-stage">
+
+<section id="commands-panel-connection" class="commands-stage-panel commands-connection-settings is-active" data-commands-section="connection" aria-label="Connection settings">
+<header class="commands-stage-header">
+<div class="commands-stage-heading">
+<h3 class="commands-stage-title">Connection</h3>
+<p class="commands-stage-subtitle">Point this UI at your Nano Core API.</p>
 </div>
+</header>
+<div class="commands-connection-fields">
+<div class="commands-connection-field">
 <label class="connection-label" for="nano-connection-url">API URL</label>
-<input id="nano-connection-url" class="connection-input" type="url" placeholder="http://&lt;PI-IP&gt;:8080 (or leave empty for this site)" />
+<input id="nano-connection-url" class="connection-input" type="url" placeholder="http://&lt;PI-IP&gt;:8080 or leave blank" />
+</div>
+<div class="commands-connection-field">
 <label class="connection-label" for="nano-connection-key">API key</label>
 <input id="nano-connection-key" class="connection-input" type="password" placeholder="Same as API_KEY on the Pi" autocomplete="off" />
-<p id="nano-connection-status" class="nano-connection-status" aria-live="polite"></p>
-<div class="nano-connection-actions">
-<button id="nano-connection-test" type="button">Test connection</button>
+</div>
+<div id="connection-status-card" class="connection-status-card" data-state="unknown" aria-live="polite">
+<div class="connection-status-card__head">
+<span class="connection-status-card__dot" aria-hidden="true"></span>
+<span id="connection-status-badge" class="connection-status-card__label">Checking…</span>
+</div>
+<p id="nano-connection-status" class="connection-status-card__detail" hidden></p>
+</div>
+<div class="commands-connection-footer">
+<button id="nano-connection-test" class="commands-connection-test" type="button">Test connection</button>
+</div>
 </div>
 </section>
-</details>
 
-<section class="commands-voice-settings" aria-label="Voice settings">
-<div class="commands-voice-header">
-<h3 class="commands-group-title">Voice</h3>
-<span id="voice-volume-value" class="voice-volume-value">50%</span>
+<section id="commands-panel-voice" class="commands-stage-panel" data-commands-section="voice" aria-label="Voice settings" hidden>
+<header class="commands-stage-header">
+<div class="commands-stage-heading">
+<h3 class="commands-stage-title">Voice</h3>
+<p class="commands-stage-subtitle">Adjust how the assistant listens and responds.</p>
 </div>
-<label class="voice-volume-label" for="voice-volume">Volume</label>
+</header>
+<div class="commands-voice-settings">
+<div class="commands-volume-row">
+<span class="commands-volume-icon" aria-hidden="true">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 5L6 9H3v6h3l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+</span>
 <input
 id="voice-volume"
 class="voice-volume"
@@ -429,25 +451,58 @@ min="0"
 max="100"
 step="1"
 value="50"
+aria-label="Voice volume"
 />
-<div class="commands-voice-mode">
-<span class="voice-volume-label">Voice mode</span>
-<div class="voice-mode-toggle" role="group" aria-label="Voice mode">
-<button id="voice-mode-off" class="voice-mode-btn active" type="button" aria-pressed="true">Off</button>
-<button id="voice-mode-on" class="voice-mode-btn" type="button" aria-pressed="false">On</button>
+<span id="voice-volume-value" class="voice-volume-value">50%</span>
 </div>
+<div class="commands-action-grid commands-voice-settings-grid">
+<div class="commands-setting-card">
+<span class="commands-setting-card__icon" aria-hidden="true">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 10v4"/><path d="M8 6v12"/><path d="M12 4v16"/><path d="M16 8v8"/><path d="M20 10v4"/></svg>
+</span>
+<div class="commands-setting-card__copy">
+<span class="commands-setting-card__label">Voice mode</span>
+<p class="commands-setting-card__hint">Hands-free wake word and spoken commands.</p>
 </div>
-<div class="commands-debug-mode">
-<span class="voice-volume-label">Debug mode</span>
-<div class="voice-mode-toggle" role="group" aria-label="Debug mode">
-<button id="debug-mode-off" class="voice-mode-btn active" type="button" aria-pressed="true">Off</button>
-<button id="debug-mode-on" class="voice-mode-btn" type="button" aria-pressed="false">On</button>
+<label class="commands-switch" for="voice-mode-toggle">
+<input id="voice-mode-toggle" class="commands-switch__input" type="checkbox" role="switch" aria-label="Voice mode" />
+<span class="commands-switch__track" aria-hidden="true"><span class="commands-switch__thumb"></span></span>
+</label>
 </div>
 </div>
 <p id="voice-support-notice" class="voice-support-notice" hidden></p>
+</div>
 </section>
 
-<div id="commands-list" class="commands-list"></div>
+<section id="commands-panel-system" class="commands-stage-panel commands-stage-panel--category" data-commands-section="category-system" aria-label="System settings" hidden>
+<header class="commands-stage-header">
+<div class="commands-stage-heading">
+<h3 class="commands-stage-title">System</h3>
+<p class="commands-stage-subtitle">Diagnostics and assistant controls.</p>
+</div>
+</header>
+<div id="commands-system-action-grid" class="commands-action-grid">
+<div class="commands-setting-card">
+<span class="commands-setting-card__icon" aria-hidden="true">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 9V5.5a2.5 2.5 0 0 1 5 0V9"/><path d="M5 9h14l-1 10H6L5 9z"/><path d="M10 13h4"/></svg>
+</span>
+<div class="commands-setting-card__copy">
+<span class="commands-setting-card__label">Debug mode</span>
+<p class="commands-setting-card__hint">Show live state and voice capture on the home screen.</p>
+</div>
+<label class="commands-switch" for="debug-mode-toggle">
+<input id="debug-mode-toggle" class="commands-switch__input" type="checkbox" role="switch" aria-label="Debug mode" />
+<span class="commands-switch__track" aria-hidden="true"><span class="commands-switch__thumb"></span></span>
+</label>
+</div>
+</div>
+</section>
+
+<div id="commands-category-panels" class="commands-category-panels"></div>
+
+</div>
+
+</div>
 
 </div>
 

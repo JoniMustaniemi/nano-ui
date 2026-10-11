@@ -5,12 +5,18 @@ const VIEW_TITLES = {
   calendar: "Calendar",
 };
 
+const VIEW_SUBTITLES = {
+  commands: "Configure voice and interface commands",
+};
+
 const VIEW_OPEN_ACK = {
   brains: "Opening Brains.",
   storage: "Opening saved timers.",
   commands: "Opening commands.",
   calendar: "Opening Calendar.",
 };
+
+let viewReturnStack = [];
 
 const VIEW_PANELS = {
   brains: () => viewPanelBrains,
@@ -57,10 +63,18 @@ async function loadViewData(view) {
     if (typeof initConnectionSettings === "function") {
       initConnectionSettings();
     }
+    if (typeof refreshConnectionStatusBadge === "function") {
+      void refreshConnectionStatusBadge();
+    }
     if (commandsList && !commandsList.querySelector(".command-button")) {
       await loadAndRenderToolCommands();
     }
-    expandCommandDropdowns();
+    if (typeof initCommandsRail === "function") {
+      initCommandsRail();
+    }
+    if (typeof applyCommandsSectionVisual === "function" && typeof currentCommandsSection === "string") {
+      applyCommandsSectionVisual(currentCommandsSection);
+    }
     applyVoiceVolume();
     syncVoiceModeToggleUi();
     return;
@@ -121,11 +135,46 @@ function resetViewSessionListening() {
   viewSessionListening = false;
 }
 
+function updateViewModalBack() {
+  const back = viewModalBack;
+  if (!back) {
+    return;
+  }
+  const returnView = viewReturnStack[viewReturnStack.length - 1];
+  const canGoBack = Boolean(returnView);
+  back.hidden = !canGoBack;
+  if (!canGoBack) {
+    return;
+  }
+  const returnTitle = VIEW_TITLES[returnView] || "Previous";
+  back.setAttribute("aria-label", `Back to ${returnTitle}`);
+  const label = back.querySelector(".view-modal-back-label");
+  if (label) {
+    label.textContent = returnTitle;
+  }
+}
+
+function applyViewModalHeadline(view) {
+  if (viewModalTitle) {
+    viewModalTitle.textContent = VIEW_TITLES[view] || "View";
+  }
+  const subtitle = document.getElementById("view-modal-subtitle");
+  if (subtitle) {
+    const text = VIEW_SUBTITLES[view] || "";
+    subtitle.textContent = text;
+    subtitle.hidden = !text;
+  }
+  if (viewModalPanel) {
+    viewModalPanel.classList.toggle("view-modal-panel--commands", view === "commands");
+  }
+  updateViewModalBack();
+}
+
 function openViewModalShell(view) {
   if (!viewModal || !viewModalTitle) {
     return false;
   }
-  viewModalTitle.textContent = VIEW_TITLES[view] || "View";
+  applyViewModalHeadline(view);
   showViewPanel(view);
   viewModal.classList.add("open");
   viewModal.setAttribute("aria-hidden", "false");
@@ -153,7 +202,15 @@ function closeViewModalShell() {
   setViewModalExpanded(false);
 }
 
-async function openViewSession(view, { source = "ui" } = {}) {
+async function goBackViewSession() {
+  if (!viewSessionActive || viewReturnStack.length === 0) {
+    return false;
+  }
+  const returnView = viewReturnStack.pop();
+  return openViewSession(returnView, { source: viewSessionSource || "ui", fromViewBack: true });
+}
+
+async function openViewSession(view, { source = "ui", fromViewBack = false } = {}) {
   if (getDisplayState() === "working") {
     return false;
   }
@@ -165,6 +222,9 @@ async function openViewSession(view, { source = "ui" } = {}) {
   const previousSessionActive = viewSessionActive;
   const previousSessionSource = viewSessionSource;
   const previousControlsHidden = controlsHidden;
+  if (!fromViewBack && viewSessionActive && previousView && previousView !== view) {
+    viewReturnStack.push(previousView);
+  }
   if (viewSessionActive && previousView !== view) {
     prepareViewSwitch(previousView);
   }
@@ -208,6 +268,7 @@ function closeViewSession({ reason = "ui", restoreWake = true } = {}) {
     resetViewSessionListening();
     return;
   }
+  viewReturnStack = [];
   viewSessionActive = false;
   activeView = null;
   viewSessionSource = null;
