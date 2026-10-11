@@ -79,6 +79,49 @@ async function deleteTimerById(id) {
   );
 }
 
+async function createStopwatch({ label = "Stopwatch", startAt = null } = {}) {
+  const body = {
+    label: String(label || "Stopwatch").trim() || "Stopwatch",
+  };
+  if (startAt != null) {
+    body.start_at = startAt;
+  }
+  const response = await nanoFetch("/api/stopwatches", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (response.status === 404 || response.status === 405) {
+    const error = new Error("Stopwatch create is not available. Upgrade nano-core on the Pi.");
+    error.status = response.status;
+    throw error;
+  }
+  return parseJsonResponse(response, "Stopwatch create failed");
+}
+
+async function deleteStopwatchById(id) {
+  const normalizedId = id != null ? String(id).trim() : "";
+  if (!normalizedId) {
+    throw new Error("Stopwatch id is required.");
+  }
+  return deleteResource(
+    `/api/stopwatches/${encodeURIComponent(normalizedId)}`,
+    "Stopwatch stop failed",
+    {
+      createError: (message, status) => {
+        if (typeof createStopwatchApiError === "function") {
+          return createStopwatchApiError(message, status);
+        }
+        const error = new Error(message);
+        error.status = status;
+        return error;
+      },
+    },
+  );
+}
+
 async function createCountdownTimer({ durationSeconds, label = "Timer", startAt = null } = {}) {
   const duration = Math.floor(Number(durationSeconds));
   if (!Number.isFinite(duration) || duration <= 0) {

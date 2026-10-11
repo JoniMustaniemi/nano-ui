@@ -13,51 +13,6 @@ function formatTaskWaitClock(seconds) {
   return negative ? `-${formatted}` : formatted;
 }
 
-function parseTimerDurationSeconds(text) {
-  const normalized = String(text || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!normalized || normalized === "cancel") {
-    return 0;
-  }
-  let total = 0;
-  const hourMatch = normalized.match(/(\d+)\s*h(?:ours?)?\b/);
-  const minuteMatch = normalized.match(/(\d+)\s*m(?:in(?:ute)?s?)?\b/);
-  const secondMatch = normalized.match(/(\d+)\s*s(?:ec(?:ond)?s?)?\b/);
-  if (hourMatch) {
-    total += Number(hourMatch[1]) * 3600;
-  }
-  if (minuteMatch) {
-    total += Number(minuteMatch[1]) * 60;
-  }
-  if (secondMatch) {
-    total += Number(secondMatch[1]);
-  }
-  if (total > 0) {
-    return total;
-  }
-  const bareNumber = normalized.match(/^(\d+)$/);
-  if (bareNumber) {
-    return Number(bareNumber[1]) * 60;
-  }
-  const spelledMinutes = normalized.match(/^(\d+)\s+minutes?$/);
-  if (spelledMinutes) {
-    return Number(spelledMinutes[1]) * 60;
-  }
-  const spelledHours = normalized.match(/^(\d+)\s+hours?$/);
-  if (spelledHours) {
-    return Number(spelledHours[1]) * 3600;
-  }
-  const spelledSeconds = normalized.match(/^(\d+)\s+seconds?$/);
-  if (spelledSeconds) {
-    return Number(spelledSeconds[1]);
-  }
-  return 0;
-}
-
-const LOCAL_TIMER_DURATION_PROMPT = "How long should the timer run?";
 const GENERIC_WORKING_PROGRESS_PATTERN =
   /\b(?:finishing up|almost there|give me a moment|one moment|working on it|hang on|just a sec|please wait)\b/i;
 
@@ -67,125 +22,6 @@ function isGenericWorkingProgressCopy(headline, detail) {
     return true;
   }
   return GENERIC_WORKING_PROGRESS_PATTERN.test(combined);
-}
-
-function isBareTimerStartMessage(message) {
-  const text = String(message || "").trim();
-  if (!text || /^cancel$/i.test(text)) {
-    return false;
-  }
-  if (extractTimerDurationSecondsFromMessage(text) > 0) {
-    return false;
-  }
-  const normalized = text
-    .toLowerCase()
-    .replace(/[.!?]+$/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (/^start a timer$/.test(normalized)) {
-    return true;
-  }
-  if (/^(?:please\s+)?(?:set|start)\s+(?:a\s+)?timer$/.test(normalized)) {
-    return true;
-  }
-  if (/\b(?:set|start)\s+(?:a\s+)?timer\b/.test(normalized) && !/\bfor\b/.test(normalized)) {
-    return !/\b\d+\b/.test(normalized);
-  }
-  return false;
-}
-
-function beginLocalTimerDurationPrompt() {
-  currentAnswerPendingKind = "timer_duration";
-  currentInputKind = "timer_duration";
-  waitingForFollowUp = true;
-  waitingForVoiceAnswer = false;
-  setAnswer(LOCAL_TIMER_DURATION_PROMPT, { animate: true });
-  syncInputActions();
-  if (voiceAvailable && typeof ensureDirectAnswerListening === "function") {
-    ensureDirectAnswerListening(pendingListenStatus("timer_duration"));
-  }
-}
-
-let countdownCreateInFlight = false;
-
-function clearTimerDurationPromptState() {
-  currentAnswerPendingKind = null;
-  currentInputKind = null;
-  waitingForFollowUp = false;
-  waitingForVoiceAnswer = false;
-  clearPendingCountdownAnchor();
-  if (typeof clearPendingState === "function") {
-    clearPendingState();
-  }
-  syncInputActions();
-}
-
-async function startCountdownFromDuration(durationSeconds, options = {}) {
-  const normalized = Math.floor(Number(durationSeconds));
-  const displayMessage = String(options.displayMessage || "").trim();
-
-  if (requestInFlight || reconnectInProgress || countdownCreateInFlight) {
-    replyStatus.textContent = "Wait for the current task to finish.";
-    return false;
-  }
-
-  if (!normalized || normalized <= 0) {
-    if (displayMessage && /^cancel$/i.test(displayMessage)) {
-      clearTimerDurationPromptState();
-      replyStatus.textContent = "";
-      if (typeof clearAnswerOutput === "function") {
-        clearAnswerOutput();
-      }
-    }
-    return false;
-  }
-
-  countdownCreateInFlight = true;
-  requestInFlight = true;
-  if (displayMessage) {
-    showUserSpeech(displayMessage);
-  }
-  replyStatus.textContent = "Starting timer...";
-  if (typeof updateInputLock === "function") {
-    updateInputLock();
-  }
-  syncInputActions();
-
-  try {
-    await createCountdownTimer({
-      durationSeconds: normalized,
-      label: options.label || "Timer",
-      startAt: options.startAt ?? null,
-    });
-    clearTimerDurationPromptState();
-    replyStatus.textContent = "";
-    if (typeof clearAnswerOutput === "function") {
-      clearAnswerOutput();
-    }
-    if (typeof syncRuntimeStatus === "function") {
-      await syncRuntimeStatus();
-    }
-    return true;
-  } catch (error) {
-    replyStatus.textContent = error.message || "Could not start timer.";
-    return false;
-  } finally {
-    countdownCreateInFlight = false;
-    requestInFlight = false;
-    if (typeof updateInputLock === "function") {
-      updateInputLock();
-    }
-    syncInputActions();
-  }
-}
-
-async function tryStartCountdownFromMessage(message) {
-  const durationSeconds = extractTimerDurationSecondsFromMessage(message);
-  if (durationSeconds <= 0) {
-    return false;
-  }
-  await startCountdownFromDuration(durationSeconds, { displayMessage: message });
-  return true;
 }
 
 function shouldSkipRequestAck(message, source, commandHint, context = {}) {
@@ -204,23 +40,17 @@ function shouldSkipRequestAck(message, source, commandHint, context = {}) {
   if (commandHint && typeof isTimerToolCommand === "function" && isTimerToolCommand(commandHint)) {
     return true;
   }
+  if (commandHint && typeof isStopwatchToolCommand === "function" && isStopwatchToolCommand(commandHint)) {
+    return true;
+  }
+  if (isStopwatchStartMessage(message)) {
+    return true;
+  }
   return false;
 }
 
 function shouldSkipTimerStartSpeech(context = {}) {
   return Boolean(context.isTimerDurationSubmit);
-}
-
-function extractTimerDurationSecondsFromMessage(message) {
-  const text = String(message || "").trim();
-  if (!text) {
-    return 0;
-  }
-  const startForMatch = text.match(/^start a timer for (.+)$/i);
-  if (startForMatch?.[1]) {
-    return parseTimerDurationSeconds(startForMatch[1]);
-  }
-  return parseTimerDurationSeconds(text);
 }
 
 function getCountdownAnchor(timer) {
@@ -233,6 +63,9 @@ function getCountdownAnchor(timer) {
 function shouldApplyCountdownAnchor(timer, anchor) {
   if (!timer || isStopwatchTimer(timer) || !anchor?.durationSeconds) {
     return false;
+  }
+  if (timer?.client_countdown?.durationSeconds > 0) {
+    return true;
   }
   const startedAtMs = resolveTimerStartedAtMs(timer);
   if (Number.isNaN(startedAtMs)) {
@@ -282,6 +115,17 @@ function inferTimerDurationSeconds(timer) {
   return Math.max(0, Math.round((dueAt - startedAt) / 1000));
 }
 
+function isOptimisticCountdownTimer(timer) {
+  if (!timer || isStopwatchTimer(timer)) {
+    return false;
+  }
+  if (timer.local) {
+    return true;
+  }
+  const id = timer?.id != null ? String(timer.id).trim() : "";
+  return id.startsWith("optimistic-countdown-");
+}
+
 function isSameCountdownSession(serverTimer, localTimer) {
   if (!serverTimer || !localTimer) {
     return false;
@@ -306,13 +150,41 @@ function isSameCountdownSession(serverTimer, localTimer) {
 }
 
 function mergeCountdownTimersFromServer(serverTimers) {
-  const reconciled = extractCountdownTimers(serverTimers).map(reconcileCountdownTimer);
-  const locals = currentActiveTimers.filter((timer) => timer.local && !isStopwatchTimer(timer));
+  const reconciled = extractCountdownTimers(serverTimers).map((timer) => {
+    const timerId = timer?.id != null ? String(timer.id).trim() : "";
+    if (timerId && !timer.client_countdown) {
+      const existing = currentActiveTimers.find(
+        (entry) => entry?.id != null && String(entry.id).trim() === timerId,
+      );
+      if (existing?.client_countdown?.durationSeconds > 0) {
+        return reconcileCountdownTimer({
+          ...timer,
+          client_countdown: existing.client_countdown,
+        });
+      }
+    }
+    return reconcileCountdownTimer(timer);
+  });
+  const locals = currentActiveTimers.filter(
+    (timer) => !isStopwatchTimer(timer) && isOptimisticCountdownTimer(timer),
+  );
   const merged = [...reconciled];
   for (const local of locals) {
-    if (!reconciled.some((serverTimer) => isSameCountdownSession(serverTimer, local))) {
-      merged.push(reconcileCountdownTimer(local));
+    if (reconciled.some((serverTimer) => isSameCountdownSession(serverTimer, local))) {
+      continue;
     }
+    const anchor = local.client_countdown;
+    if (
+      anchor &&
+      reconciled.some(
+        (serverTimer) =>
+          serverTimer?.client_countdown?.startedAtMs === anchor.startedAtMs &&
+          serverTimer?.client_countdown?.durationSeconds === anchor.durationSeconds,
+      )
+    ) {
+      continue;
+    }
+    merged.push(reconcileCountdownTimer(local));
   }
   return merged;
 }
@@ -470,12 +342,25 @@ function isTimerActivitySource(source) {
   );
 }
 
+const MIN_PLAUSIBLE_STOPWATCH_START_MS = Date.UTC(2020, 0, 1);
+
+function isPlausibleStopwatchStartMs(value) {
+  return Number.isFinite(value) && value >= MIN_PLAUSIBLE_STOPWATCH_START_MS;
+}
+
 function resolveTimerStartedAtMs(timer) {
   if (timer?.startedAtMs != null && !Number.isNaN(Number(timer.startedAtMs))) {
-    return Number(timer.startedAtMs);
+    const startedAtMs = Number(timer.startedAtMs);
+    if (isStopwatchTimer(timer) && !isPlausibleStopwatchStartMs(startedAtMs)) {
+      return Number.NaN;
+    }
+    return startedAtMs;
   }
   const parsed = Date.parse(timer?.started_at || timer?.created_at || "");
   if (!Number.isNaN(parsed)) {
+    if (isStopwatchTimer(timer) && !isPlausibleStopwatchStartMs(parsed)) {
+      return Number.NaN;
+    }
     return parsed;
   }
   if (timer?.elapsed_seconds != null) {
@@ -1069,23 +954,22 @@ function getActiveTimerRemainingMs(timer) {
   if (!timer || isStopwatchTimer(timer)) {
     return Number.POSITIVE_INFINITY;
   }
-  const remainingSeconds = Number(timer?.remaining_seconds);
-  if (Number.isFinite(remainingSeconds) && remainingSeconds >= 0) {
-    return remainingSeconds * 1000;
+  if (timer.due_at) {
+    const dueAt = Date.parse(timer.due_at);
+    if (!Number.isNaN(dueAt)) {
+      return dueAt - Date.now();
+    }
   }
   const durationSeconds = Number(timer?.duration_seconds);
   const startedAtMs = resolveTimerStartedAtMs(timer);
   if (Number.isFinite(durationSeconds) && durationSeconds > 0 && !Number.isNaN(startedAtMs)) {
     return durationSeconds * 1000 - (Date.now() - startedAtMs);
   }
-  if (!timer.due_at) {
-    return Number.POSITIVE_INFINITY;
+  const remainingSeconds = Number(timer?.remaining_seconds);
+  if (Number.isFinite(remainingSeconds) && remainingSeconds >= 0) {
+    return remainingSeconds * 1000;
   }
-  const dueAt = Date.parse(timer.due_at);
-  if (Number.isNaN(dueAt)) {
-    return Number.POSITIVE_INFINITY;
-  }
-  return dueAt - Date.now();
+  return Number.POSITIVE_INFINITY;
 }
 
 function clearScheduledTimerExpiries() {
@@ -1227,12 +1111,15 @@ function getActiveTimerElapsedSeconds(timer) {
   }
   if (isStopwatchTimer(timer)) {
     if (timer.startedAtMs != null && !Number.isNaN(Number(timer.startedAtMs))) {
-      return Math.max(0, Math.floor((Date.now() - Number(timer.startedAtMs)) / 1000));
+      const startedAtMs = Number(timer.startedAtMs);
+      if (isPlausibleStopwatchStartMs(startedAtMs)) {
+        return Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000));
+      }
     }
     const startedAtValue = timer.started_at || timer.created_at;
     if (startedAtValue) {
       const startedAt = Date.parse(startedAtValue);
-      if (!Number.isNaN(startedAt)) {
+      if (isPlausibleStopwatchStartMs(startedAt)) {
         return Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
       }
     }

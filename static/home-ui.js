@@ -659,9 +659,30 @@ async function loadToolCommands() {
   return filterToolCommands(supplementToolCommands(commands));
 }
 
+function isStopwatchToolCommand(command) {
+  const id = String(command?.id || "").toLowerCase();
+  if (EXCLUDED_TOOL_COMMAND_IDS.has(id)) {
+    return false;
+  }
+  if (id.includes("stopwatch")) {
+    return id !== "stop_stopwatches" && id !== "rename_stopwatch";
+  }
+  const action = String(command?.client_action || "").toLowerCase();
+  const message = String(command?.message || "").toLowerCase();
+  const label = String(command?.label || "").toLowerCase();
+  return (
+    action.includes("stopwatch") ||
+    /\bstopwatch\b/.test(message) ||
+    /\bstopwatch\b/.test(label)
+  );
+}
+
 function isTimerToolCommand(command) {
   const id = String(command?.id || "").toLowerCase();
   if (EXCLUDED_TOOL_COMMAND_IDS.has(id)) {
+    return false;
+  }
+  if (id.includes("stopwatch")) {
     return false;
   }
   const action = String(command?.client_action || "").toLowerCase();
@@ -679,6 +700,9 @@ function resolveToolCommandMessage(command) {
   const message = String(command?.message || "").trim();
   if (message) {
     return message;
+  }
+  if (typeof isStopwatchToolCommand === "function" && isStopwatchToolCommand(command)) {
+    return "Start a stopwatch";
   }
   if (isTimerToolCommand(command)) {
     return "Start a timer";
@@ -718,14 +742,12 @@ async function runToolCommand(command) {
   if (isViewSessionActive()) {
     closeViewSession({ reason: "ui", restoreWake: false });
   }
-  if (isTimerToolCommand(command) && isBareTimerStartMessage(message)) {
-    showUserSpeech(message);
-    beginLocalTimerDurationPrompt();
+  const stopwatchCommandResult = await handleStopwatchToolCommand(command, message);
+  if (stopwatchCommandResult.handled) {
     return;
   }
-  const timerDurationSeconds = extractTimerDurationSecondsFromMessage(message);
-  if (isTimerToolCommand(command) && timerDurationSeconds > 0) {
-    await startCountdownFromDuration(timerDurationSeconds, { displayMessage: message });
+  const timerCommandResult = await handleTimerToolCommand(command, message);
+  if (timerCommandResult.handled) {
     return;
   }
   await submitMessage(message, "command", command);

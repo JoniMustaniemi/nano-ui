@@ -68,7 +68,7 @@ async function submitDefaultNoAnswer() {
 }
 
 async function submitInputAnswer(answer) {
-  if (requestInFlight || reconnectInProgress) {
+  if (reconnectInProgress) {
     return;
   }
   if (!inputActions || inputActions.hidden) {
@@ -84,6 +84,9 @@ async function submitInputAnswer(answer) {
     !isYesNo &&
     (currentAnswerPendingKind === "timer_duration" || currentInputKind === "timer_duration")
   ) {
+    if (countdownCreateInFlight) {
+      return;
+    }
     const raw = String(answer || "").trim();
     if (/^cancel$/i.test(raw)) {
       clearTimerDurationPromptState();
@@ -94,7 +97,10 @@ async function submitInputAnswer(answer) {
       return;
     }
     const durationSeconds = parseTimerDurationSeconds(raw);
-    await startCountdownFromDuration(durationSeconds, { displayMessage: raw });
+    await commitDurationSeconds(durationSeconds, { displayMessage: raw });
+    return;
+  }
+  if (requestInFlight) {
     return;
   }
   await submitMessage(message, "text", hint);
@@ -335,8 +341,13 @@ async function handleChatVoiceFollowUp(answerText, shouldSpeak, message) {
 async function submitMessage(message, source, commandHint, options = {}) {
   const context = buildSubmitMessageContext(message, source, commandHint, options);
   const pendingReconnectKind = resolvePendingReconnectKind(message);
-  if (!pendingReconnectKind && extractTimerDurationSecondsFromMessage(message) > 0) {
-    if (await tryStartCountdownFromMessage(message)) {
+  if (!pendingReconnectKind) {
+    const timerResult = await handleTimerUserMessage(message, source, options, context);
+    if (timerResult.handled) {
+      return;
+    }
+    const stopwatchResult = await handleStopwatchUserMessage(message, source, options, context);
+    if (stopwatchResult.handled) {
       return;
     }
   }
@@ -349,12 +360,6 @@ async function submitMessage(message, source, commandHint, options = {}) {
     return;
   }
   if (isViewSessionActive() && source !== "command" && source !== "voice") {
-    return;
-  }
-
-  if (!context.isPendingInputAnswer && isBareTimerStartMessage(message)) {
-    showUserSpeech(message);
-    beginLocalTimerDurationPrompt();
     return;
   }
 

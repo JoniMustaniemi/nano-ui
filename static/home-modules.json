@@ -14,6 +14,7 @@
   "home-stopwatches.js",
   "home-timers.js",
   "home-timers-display.js",
+  "home-timer-flow.js",
   "home-events.js",
   "home-metrics.js",
   "home-activity.js",

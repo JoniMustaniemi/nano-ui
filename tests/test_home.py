@@ -542,24 +542,63 @@ def test_timer_tool_command_helpers() -> None:
     chat_js = (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
     voice_js = (STATIC_DIR / "home-voice.js").read_text(encoding="utf-8")
     api_js = (STATIC_DIR / "home-timer-api.js").read_text(encoding="utf-8")
-    timers_js = (STATIC_DIR / "home-timers.js").read_text(encoding="utf-8")
+    flow_js = (STATIC_DIR / "home-timer-flow.js").read_text(encoding="utf-8")
+    manifest_modules = list(HOME_JS_MODULES)
+
+    assert "home-timer-flow.js" in manifest_modules
+    assert manifest_modules.index("home-timer-flow.js") < manifest_modules.index("home-chat.js")
 
     assert "resolveToolCommandMessage" in ui_js
     assert "isTimerToolCommand" in ui_js
     assert 'return "Start a timer"' in ui_js
+    assert "handleTimerToolCommand" in ui_js
     assert "EXCLUDED_TOOL_COMMAND_IDS" in ui_js
     assert 'source !== "command"' in chat_js
-    assert "startCountdownFromDuration" in chat_js
-    assert "tryStartCountdownFromMessage" in chat_js
+    assert "commitDurationSeconds" in chat_js
+    assert "handleTimerUserMessage" in chat_js
     assert "tryArmCountdownFromMessage" not in chat_js
     assert "createCountdownTimer" in api_js
     assert '"/api/timers"' in api_js
     assert "duration_seconds" in api_js
     assert "Upgrade nano-core" in api_js
-    assert "startCountdownFromDuration" in timers_js
-    assert "startCountdownFromDuration" in ui_js
-    assert "isBareTimerStartMessage" in timers_js
-    assert "beginLocalTimerDurationPrompt" in chat_js
+    assert "commitDurationSeconds" in flow_js
+    assert "startCountdownFromDuration" in flow_js
+    assert "isBareTimerStartMessage" in flow_js
+    assert "normalizeTimerStartIntentText" in flow_js
+    assert "enrichCountdownTimerFromDuration" in flow_js
+    assert "applyCreatedCountdownTimer" in flow_js
+    submit_fn = chat_js.split("async function submitMessage", 1)[1].split(
+        "async function stopActiveStopwatch", 1
+    )[0]
+    submit_fast_path = submit_fn.split("prepareSubmitMessageState", 1)[0]
+    assert "handleTimerUserMessage" in submit_fast_path
+    assert "handleStopwatchUserMessage" in submit_fast_path
+    assert "beginLocalTimerDurationPrompt" not in submit_fast_path
+    assert "isStopwatchToolCommand" in ui_js
+    assert "handleStopwatchToolCommand" in ui_js
+    assert "createStopwatch" in api_js
+    assert '"/api/stopwatches"' in api_js
+    assert "commitStopwatchStart" in flow_js
+    assert "stopwatchCreateInFlight" in flow_js
+    assert "client_started_at_ms" in flow_js
+    commit_stopwatch_fn = flow_js.split("async function commitStopwatchStart", 1)[1].split(
+        "async function handleStopwatchUserMessage", 1
+    )[0]
+    assert "postTimerAgentCommandSilently" not in commit_stopwatch_fn
+    assert "requestInFlight" not in commit_stopwatch_fn
+    assert "submitMessage" not in commit_stopwatch_fn
+    assert "stopwatchCreateInFlight" in voice_js
+    timers_js = (STATIC_DIR / "home-timers.js").read_text(encoding="utf-8")
+    assert "isPlausibleStopwatchStartMs" in timers_js
+    assert "resolveTimerStartedAtMs" in timers_js
+    commit_fn = flow_js.split("async function commitDurationSeconds", 1)[1].split(
+        "async function startCountdownFromDuration", 1
+    )[0]
+    assert "requestInFlight" not in commit_fn
+    assert "submitMessage" not in commit_fn
+    assert "scheduleTimerStatusSync" in flow_js
+    assert "void syncRuntimeStatus" in flow_js
+    assert "countdownCreateInFlight" in voice_js
     assert "shouldSkipRequestAck" in chat_js
     assert "answerNeedsTimerDuration" in voice_js
     assert "restoreWake: false" in ui_js
@@ -601,6 +640,10 @@ def test_active_timer_ui() -> None:
     assert "active-timer-item--hero" in activity_js
     assert "active-timer-progress-fill" in activity_js
     assert "getTimerProgress" in activity_js
+    remaining_fn = activity_js.split("function getActiveTimerRemainingMs", 1)[1].split(
+        "function clearScheduledTimerExpiries", 1
+    )[0]
+    assert remaining_fn.index("timer.due_at") < remaining_fn.index("remaining_seconds")
     assert "parseTimerDurationSeconds" in activity_js
     assert "armPendingCountdownAnchor" in activity_js
     assert "mergeCountdownTimersFromServer" in activity_js

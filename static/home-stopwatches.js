@@ -68,9 +68,19 @@ function getStopwatchStateKeys(timer) {
 }
 
 function isStopwatchStartMessage(message) {
-  const lowered = String(message || "")
-    .toLowerCase()
-    .replace(/\bstop\s+watch(?:es)?\b/g, "stopwatch");
+  const base =
+    typeof normalizeUiCommandText === "function"
+      ? normalizeUiCommandText(message)
+      : String(message || "").trim().toLowerCase();
+  const lowered = base
+    .replace(/\bstop\s+watch(?:es)?\b/g, "stopwatch")
+    .replace(
+      /^(?:(?:can|could|would|will)\s+you\s+|(?:i(?:\s+would|\s+'d)?\s+)?(?:want|need)\s+to\s+|go\s+ahead\s+and\s+)/,
+      "",
+    )
+    .replace(/^(?:please\s+)+/, "")
+    .replace(/\s+please$/, "")
+    .trim();
   if (!/\bstopwatch\b/.test(lowered)) {
     return false;
   }
@@ -290,6 +300,7 @@ function createStopwatchApiError(message, status) {
 function isStopwatchNotFoundError(error) {
   return Number(error?.status) === 404;
 }
+
 function isStopwatchIdActive(stopwatchId) {
   const normalizedId = stopwatchId != null ? String(stopwatchId).trim() : "";
   if (!normalizedId) {
@@ -447,6 +458,29 @@ function clearAllLocalTimerState() {
   refreshTimerDisplays();
 }
 
+function findLocalClientStartedAtMsForServerStopwatch(serverTimer) {
+  const label = serverTimer?.label || "Stopwatch";
+  const serverId = serverTimer?.id != null ? String(serverTimer.id).trim() : "";
+  let optimisticMatch = null;
+  for (const stopwatch of localStopwatches.values()) {
+    const clientMs = Number(stopwatch?.client_started_at_ms);
+    if (!Number.isFinite(clientMs)) {
+      continue;
+    }
+    if (serverId && String(stopwatch?.id || "").trim() === serverId) {
+      return clientMs;
+    }
+    if ((stopwatch.label || "Stopwatch") !== label) {
+      continue;
+    }
+    const id = String(stopwatch?.id || "").trim();
+    if (id.startsWith("local-stopwatch-") && !stopwatch.serverBacked) {
+      optimisticMatch = clientMs;
+    }
+  }
+  return optimisticMatch;
+}
+
 function pruneOptimisticStopwatchesForServerTimer(serverTimer) {
   const serverStartedAtMs = resolveTimerStartedAtMs(serverTimer);
   const label = serverTimer?.label || "Stopwatch";
@@ -491,11 +525,20 @@ function hydrateLocalStopwatchesFromSnapshot(snapshot) {
     if (isStopwatchStopped(serverTimer)) {
       continue;
     }
-    const startedAtMs = resolveTimerStartedAtMs(serverTimer);
+    const clientStartedMs = Number(findLocalClientStartedAtMsForServerStopwatch(serverTimer));
+    const serverStartedMs = resolveTimerStartedAtMs(serverTimer);
+    const startedAtMs = Number.isFinite(clientStartedMs)
+      ? clientStartedMs
+      : Number.isNaN(serverStartedMs)
+        ? Date.now()
+        : serverStartedMs;
     const stopwatch = createLocalStopwatch({
       label: serverTimer.label || "Stopwatch",
-      startedAtMs: Number.isNaN(startedAtMs) ? Date.now() : startedAtMs,
+      startedAtMs,
     });
+    if (Number.isFinite(clientStartedMs)) {
+      stopwatch.client_started_at_ms = clientStartedMs;
+    }
     if (serverTimer.id !== undefined && serverTimer.id !== null) {
       stopwatch.id = String(serverTimer.id);
     }
@@ -507,9 +550,20 @@ function hydrateLocalStopwatchesFromSnapshot(snapshot) {
     if (localStopwatches.has(storageKey)) {
       const existing = localStopwatches.get(storageKey);
       const nextLabel = serverTimer.label || "Stopwatch";
+      let entryChanged = false;
       if (existing.label !== nextLabel || existing.serverSource !== serverTimer) {
         existing.label = nextLabel;
         existing.serverSource = serverTimer;
+        entryChanged = true;
+      }
+      if (Number.isFinite(clientStartedMs)) {
+        existing.client_started_at_ms = clientStartedMs;
+        if (existing.startedAtMs !== clientStartedMs) {
+          existing.startedAtMs = clientStartedMs;
+          entryChanged = true;
+        }
+      }
+      if (entryChanged) {
         localStopwatches.set(storageKey, existing);
         changed = true;
       }

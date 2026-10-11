@@ -439,7 +439,7 @@ function detectWakeWordOnBuffer() {
 }
 
 async function flushPendingVoiceSubmit() {
-  if (requestInFlight || speakingActive) {
+  if (requestInFlight || speakingActive || countdownCreateInFlight || stopwatchCreateInFlight) {
     return;
   }
   const merged = pendingVoiceBuffer.trim();
@@ -618,7 +618,7 @@ function shouldPauseWakeWordListening() {
   if (!voiceModeEnabled || recognitionPaused) {
     return true;
   }
-  if (requestInFlight || speakingActive) {
+  if (requestInFlight || speakingActive || countdownCreateInFlight || stopwatchCreateInFlight) {
     return true;
   }
   return false;

@@ -186,6 +186,12 @@ function applyPendingSnapshot(pending, proactive) {
   if (kind === "presence_check") {
     return;
   }
+  if (kind === "timer_duration" && localTimerDurationPromptActive) {
+    return;
+  }
+  if (kind === "timer_duration" && ignoreServerTimerPendingUntil > Date.now()) {
+    return;
+  }
   const PENDING_SYSTEM_COMMAND_KINDS = {
     reboot_confirmation: "reboot_pi",
     service_restart_confirmation: "restart_nano",
