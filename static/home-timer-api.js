@@ -78,3 +78,28 @@ async function deleteTimerById(id) {
     "Timer cancel failed",
   );
 }
+
+async function createCountdownTimer({ durationSeconds, label = "Timer", startAt = null } = {}) {
+  const duration = Math.floor(Number(durationSeconds));
+  if (!Number.isFinite(duration) || duration <= 0) {
+    throw new Error("Timer duration must be a positive number of seconds.");
+  }
+  const body = {
+    duration_seconds: duration,
+    label: String(label || "Timer").trim() || "Timer",
+  };
+  if (startAt != null) {
+    body.start_at = startAt;
+  }
+  const response = await nanoFetch("/api/timers", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (response.status === 404) {
+    throw new Error("Timer create is not available. Upgrade nano-core on the Pi.");
+  }
+  return parseJsonResponse(response, "Timer create failed");
+}

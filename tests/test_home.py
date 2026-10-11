@@ -350,6 +350,17 @@ def test_task_start_acknowledgment() -> None:
     assert 'answerOutput.dataset.taskAck === "true"' in ui_js.split("function startWorkingResponse()")[1]
 
 
+def test_working_state_hides_generic_progress_status() -> None:
+    ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
+    events_js = (STATIC_DIR / "home-events.js").read_text(encoding="utf-8")
+    should_show_fn = ui_js.split("function shouldShowActivityStatus()", 1)[1].split(
+        "function isBaseAnswerContent", 1
+    )[0]
+    assert 'getDisplayState() === "working"' in should_show_fn
+    assert "return false" in should_show_fn
+    assert "isGenericWorkingProgressCopy" in events_js
+
+
 def test_reboot_restart_reconnect_helpers() -> None:
     activity_js = _load_home_js()
     reconnect_js = (STATIC_DIR / "home-reconnect.js").read_text(encoding="utf-8")
@@ -530,13 +541,26 @@ def test_timer_tool_command_helpers() -> None:
     ui_js = (STATIC_DIR / "home-ui.js").read_text(encoding="utf-8")
     chat_js = (STATIC_DIR / "home-chat.js").read_text(encoding="utf-8")
     voice_js = (STATIC_DIR / "home-voice.js").read_text(encoding="utf-8")
+    api_js = (STATIC_DIR / "home-timer-api.js").read_text(encoding="utf-8")
+    timers_js = (STATIC_DIR / "home-timers.js").read_text(encoding="utf-8")
 
     assert "resolveToolCommandMessage" in ui_js
     assert "isTimerToolCommand" in ui_js
     assert 'return "Start a timer"' in ui_js
     assert "EXCLUDED_TOOL_COMMAND_IDS" in ui_js
     assert 'source !== "command"' in chat_js
-    assert "formatTimerDurationAnswer" in chat_js
+    assert "startCountdownFromDuration" in chat_js
+    assert "tryStartCountdownFromMessage" in chat_js
+    assert "tryArmCountdownFromMessage" not in chat_js
+    assert "createCountdownTimer" in api_js
+    assert '"/api/timers"' in api_js
+    assert "duration_seconds" in api_js
+    assert "Upgrade nano-core" in api_js
+    assert "startCountdownFromDuration" in timers_js
+    assert "startCountdownFromDuration" in ui_js
+    assert "isBareTimerStartMessage" in timers_js
+    assert "beginLocalTimerDurationPrompt" in chat_js
+    assert "shouldSkipRequestAck" in chat_js
     assert "answerNeedsTimerDuration" in voice_js
     assert "restoreWake: false" in ui_js
 
@@ -577,6 +601,10 @@ def test_active_timer_ui() -> None:
     assert "active-timer-item--hero" in activity_js
     assert "active-timer-progress-fill" in activity_js
     assert "getTimerProgress" in activity_js
+    assert "parseTimerDurationSeconds" in activity_js
+    assert "armPendingCountdownAnchor" in activity_js
+    assert "mergeCountdownTimersFromServer" in activity_js
+    assert "isGenericWorkingProgressCopy" in activity_js
     assert "has-active-timers" in activity_js
     assert "position: absolute" not in css_text.split(".active-timers {", 1)[1].split("}", 1)[0]
     assert "cancelActiveTimer" in chat_js

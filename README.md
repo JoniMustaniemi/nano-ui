@@ -96,6 +96,12 @@ If the page loads but chat/API fails:
 - F12 → Network → **401** = wrong API key
 - F12 → Network → **CORS** = add the UI origin to the Pi `.env`, for example `CORS_ALLOWED_ORIGINS=["http://localhost:3000"]`, then run `sudo systemctl restart nano-core`
 
+## Handoff docs (nano-core)
+
+Specs written from the UI side for backend work on the Pi:
+
+- [Meeting reminders API](./docs/meeting-reminders-api.md) — calendar reminder persistence (implemented in core)
+
 ## Hosting
 
 The site is hosted on [Cloudflare Pages](https://pages.cloudflare.com/). Static files are served from the repo root, and `/api/*` requests are proxied to the Raspberry Pi by a Pages Function.

@@ -438,6 +438,7 @@ function stopAllLocalStopwatches() {
 }
 
 function clearAllLocalTimerState() {
+  clearPendingCountdownAnchor();
   for (const stopwatch of getDisplayStopwatches()) {
     markStopwatchStopped(stopwatch);
   }

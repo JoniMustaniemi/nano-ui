@@ -718,6 +718,16 @@ async function runToolCommand(command) {
   if (isViewSessionActive()) {
     closeViewSession({ reason: "ui", restoreWake: false });
   }
+  if (isTimerToolCommand(command) && isBareTimerStartMessage(message)) {
+    showUserSpeech(message);
+    beginLocalTimerDurationPrompt();
+    return;
+  }
+  const timerDurationSeconds = extractTimerDurationSecondsFromMessage(message);
+  if (isTimerToolCommand(command) && timerDurationSeconds > 0) {
+    await startCountdownFromDuration(timerDurationSeconds, { displayMessage: message });
+    return;
+  }
   await submitMessage(message, "command", command);
 }
 
@@ -1403,7 +1413,7 @@ function revealStatusRolling(content, onComplete) {
 
 function shouldShowActivityStatus() {
   if (getDisplayState() === "working") {
-    return true;
+    return false;
   }
   if (isWaitingForAnswerActivity()) {
     return true;
@@ -1512,7 +1522,7 @@ function startWorkingResponse() {
   if (answerOutput.dataset.taskAck === "true") {
     return;
   }
-  if (suppressWorkingResponse && !requestInFlight) {
+  if (suppressWorkingResponse || isWaitingForUserAnswer()) {
     return;
   }
   cancelAnswerReveal();

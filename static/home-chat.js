@@ -84,20 +84,20 @@ async function submitInputAnswer(answer) {
     !isYesNo &&
     (currentAnswerPendingKind === "timer_duration" || currentInputKind === "timer_duration")
   ) {
-    message = formatTimerDurationAnswer(answer);
+    const raw = String(answer || "").trim();
+    if (/^cancel$/i.test(raw)) {
+      clearTimerDurationPromptState();
+      replyStatus.textContent = "";
+      if (typeof clearAnswerOutput === "function") {
+        clearAnswerOutput();
+      }
+      return;
+    }
+    const durationSeconds = parseTimerDurationSeconds(raw);
+    await startCountdownFromDuration(durationSeconds, { displayMessage: raw });
+    return;
   }
   await submitMessage(message, "text", hint);
-}
-
-function formatTimerDurationAnswer(answer) {
-  const value = String(answer || "").trim();
-  if (!value || value.toLowerCase() === "cancel") {
-    return value || "cancel";
-  }
-  if (/^start a timer\b/i.test(value)) {
-    return value;
-  }
-  return `Start a timer for ${value}`;
 }
 
 async function submitConfirmationAnswer(answer) {
@@ -187,6 +187,9 @@ function buildSubmitMessageContext(message, source, commandHint, options = {}) {
       currentAnswerPendingKind === "wipe_confirmation" ||
       currentAnswerPendingKind === "timer_duration" ||
       currentInputKind === "timer_duration");
+  const isTimerDurationSubmit =
+    inputAnswer &&
+    (currentAnswerPendingKind === "timer_duration" || currentInputKind === "timer_duration");
 
   return {
     clearAllRequested:
@@ -197,6 +200,7 @@ function buildSubmitMessageContext(message, source, commandHint, options = {}) {
     isConfirmationAnswer,
     isPendingInputAnswer,
     isVoicePendingAnswer,
+    isTimerDurationSubmit,
   };
 }
 
@@ -331,6 +335,11 @@ async function handleChatVoiceFollowUp(answerText, shouldSpeak, message) {
 async function submitMessage(message, source, commandHint, options = {}) {
   const context = buildSubmitMessageContext(message, source, commandHint, options);
   const pendingReconnectKind = resolvePendingReconnectKind(message);
+  if (!pendingReconnectKind && extractTimerDurationSecondsFromMessage(message) > 0) {
+    if (await tryStartCountdownFromMessage(message)) {
+      return;
+    }
+  }
   prepareSubmitMessageState(message, source, commandHint, context);
 
   if (tryHandleUiCommand(message, source)) {
@@ -343,9 +352,15 @@ async function submitMessage(message, source, commandHint, options = {}) {
     return;
   }
 
+  if (!context.isPendingInputAnswer && isBareTimerStartMessage(message)) {
+    showUserSpeech(message);
+    beginLocalTimerDurationPrompt();
+    return;
+  }
+
   showUserSpeech(message);
   requestInFlight = true;
-  if (!context.isPendingInputAnswer) {
+  if (!shouldSkipRequestAck(message, source, commandHint, context)) {
     await acknowledgeRequest(source, commandHint);
   }
 
@@ -356,6 +371,9 @@ async function submitMessage(message, source, commandHint, options = {}) {
     const result = await sendChatRequest(message, source);
     answerText = result.answerText;
     shouldSpeak = result.shouldSpeak;
+    if (shouldSkipTimerStartSpeech(context)) {
+      shouldSpeak = false;
+    }
     if (!pendingReconnectKind) {
       setAnswer(answerText, { deferClearUntilSpeech: shouldSpeak, allowDuringWorking: true });
     }

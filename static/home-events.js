@@ -24,15 +24,18 @@ function applyActivityEvent(event) {
   if (event.kind === "log" && currentActivitySnapshot.state === "working") {
     const progressLine = (event.title || "").trim();
     if (progressLine) {
-      const nextState =
-        currentActivitySnapshot.state === "error" ? "error" : "working";
-      currentActivitySnapshot = {
-        ...currentActivitySnapshot,
-        state: nextState,
-        headline: progressLine,
-        detail: (event.detail || "").trim() || progressLine,
-      };
-      renderState();
+      const progressDetail = (event.detail || "").trim() || progressLine;
+      if (!isGenericWorkingProgressCopy(progressLine, progressDetail)) {
+        const nextState =
+          currentActivitySnapshot.state === "error" ? "error" : "working";
+        currentActivitySnapshot = {
+          ...currentActivitySnapshot,
+          state: nextState,
+          headline: progressLine,
+          detail: progressDetail,
+        };
+        renderState();
+      }
     }
     return;
   }

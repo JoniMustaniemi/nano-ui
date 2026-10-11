@@ -46,6 +46,7 @@ const expiredTimerSnapshots = new Map();
 const dismissedTimerKeys = new Set();
 const timerReminderIntervals = new Map();
 const localStopwatches = new Map();
+let pendingCountdownAnchor = null;
 const stoppedStopwatchKeys = new Set();
 const stoppedStopwatchIds = new Set();
 let currentServerStopwatches = [];

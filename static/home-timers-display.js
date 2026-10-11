@@ -288,7 +288,7 @@ function clearActiveTimersInterval() {
 }
 
 function syncActiveTimers(timers) {
-  const nextTimers = extractCountdownTimers(timers);
+  const nextTimers = mergeCountdownTimersFromServer(timers);
   const activeKeys = new Set(nextTimers.map((timer) => getTimerAnnouncementKey(timer)));
   currentActiveTimers = nextTimers;
   pruneOrphanedTimerState(activeKeys);
